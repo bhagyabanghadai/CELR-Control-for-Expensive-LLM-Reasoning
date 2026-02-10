@@ -1,7 +1,12 @@
 import json
+import logging
 from typing import Optional, List, Dict
 from celr.core.types import TaskContext, Plan, Step, StepType
 from celr.core.llm import BaseLLMProvider
+from celr.core.prompts import DECOMPOSITION_SYSTEM_PROMPT, DIFFICULTY_ESTIMATION_PROMPT
+from celr.core.exceptions import PlanningError
+
+logger = logging.getLogger(__name__)
 from celr.core.prompts import DECOMPOSITION_SYSTEM_PROMPT, DIFFICULTY_ESTIMATION_PROMPT
 
 class ReasoningCore:
@@ -12,7 +17,7 @@ class ReasoningCore:
         """Decompose a high-level task into a Plan."""
         prompt = f"Original Goal: {context.original_request}\n\nContext: {context.execution_history[-5:]}"
         
-        response = self.llm.generate(
+        response, usage = self.llm.generate(
             prompt=prompt,
             system_prompt=DECOMPOSITION_SYSTEM_PROMPT
         )
@@ -32,19 +37,24 @@ class ReasoningCore:
                 items=steps
             )
             return plan
-        except Exception as e:
-            # Fallback for parsing errors
-            context.log(f"Error parsing plan: {e}")
-            raise ValueError(f"Failed to generate valid plan from LLM response: {response}")
+        except (json.JSONDecodeError, KeyError, TypeError) as e:
+            # Log the actual error before raising
+            logger.error(f"Failed to parse plan from LLM response: {e}")
+            logger.debug(f"Raw LLM response: {response[:500]}")
+            raise PlanningError(
+                message=f"Failed to generate valid plan: {e}",
+                raw_response=response,
+            ) from e
 
     def estimate_difficulty(self, step: Step) -> float:
         """Estimate the difficulty of a single step."""
         prompt = DIFFICULTY_ESTIMATION_PROMPT.format(task_description=step.description)
-        response = self.llm.generate(prompt=prompt)
+        response, usage = self.llm.generate(prompt=prompt)
         
         try:
             clean = response.replace("```json", "").replace("```", "").strip()
             data = json.loads(clean)
             return float(data.get("difficulty_score", 0.5))
-        except:
-            return 0.5 # Default fallback
+        except (json.JSONDecodeError, ValueError, TypeError) as e:
+            logger.warning(f"Failed to parse difficulty score, using default 0.5: {e}")
+            return 0.5  # Default fallback
