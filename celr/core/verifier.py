@@ -1,7 +1,10 @@
+import logging
 from typing import Any, Optional
 from celr.core.types import Step, StepType, TaskContext
 from celr.core.tools import ToolRegistry
 from celr.core.llm import BaseLLMProvider
+
+logger = logging.getLogger(__name__)
 
 class Verifier:
     def __init__(self, tool_registry: ToolRegistry, llm: BaseLLMProvider):
@@ -36,7 +39,7 @@ class Verifier:
         """
         
         # In production, use a cheap model or a specialized verifier prompt
-        critique = self.llm.generate(prompt)
+        critique, usage = self.llm.generate(prompt)
         
         if "YES" in critique.upper():
             step.verification_notes = critique
