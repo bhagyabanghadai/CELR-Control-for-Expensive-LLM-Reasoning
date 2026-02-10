@@ -1,7 +1,10 @@
+import logging
 import networkx as nx
 from typing import List, Optional
-from celr.core.types import Plan, Step, TaskContext
+from celr.core.types import Plan, Step, TaskContext, TaskStatus
 from celr.core.reasoning import ReasoningCore
+
+logger = logging.getLogger(__name__)
 
 class Planner:
     def __init__(self, reasoning_core: ReasoningCore):
@@ -41,7 +44,7 @@ class Planner:
         for step in plan.items:
             # Sync graph state with plan object state just in case
             # (In a real system, these would be tightly coupled)
-            if step.status != "PENDING":
+            if step.status != TaskStatus.PENDING:
                 continue
                 
             # Check dependencies
@@ -50,14 +53,14 @@ class Planner:
                 # Ancestor must be COMPLETED
                 # We need to find the step object for this ancestor ID
                 ancestor_step = next((s for s in plan.items if s.id == ancestor), None)
-                if ancestor_step and ancestor_step.status != "COMPLETED":
+                if ancestor_step and ancestor_step.status != TaskStatus.COMPLETED:
                     is_ready = False
                     break
             
             # Direct parents check (redundant if ancestors check works, but safer)
             for parent in self.graph.predecessors(step.id):
                 parent_step = next((s for s in plan.items if s.id == parent), None)
-                if parent_step and parent_step.status != "COMPLETED":
+                if parent_step and parent_step.status != TaskStatus.COMPLETED:
                     is_ready = False
                     break
                     
