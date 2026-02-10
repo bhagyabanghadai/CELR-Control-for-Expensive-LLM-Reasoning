@@ -1,55 +1,157 @@
-from typing import Any, List, Optional, Dict
-from abc import ABC, abstractmethod
-import os
+"""
+LLM Provider abstraction layer.
+
+Provides BaseLLMProvider (interface) and LiteLLMProvider (real implementation).
+Uses LiteLLM for unified access to 100+ LLM providers (OpenAI, Anthropic, Ollama, etc.)
+
+Key improvements (Overhaul Phase O-2):
+- Returns (text, usage) tuple for exact cost tracking
+- Retry with exponential backoff via tenacity
+- Proper exception handling (no bare except)
+- Uses response.usage for token counts instead of len()/4 estimation
+"""
+
+import logging
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Tuple
+
 import litellm
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
+
+from celr.core.exceptions import LLMProviderError
 from celr.core.types import ModelConfig
 
-class BaseLLMProvider(ABC):
-    @abstractmethod
-    def generate(self, prompt: str, system_prompt: Optional[str] = None, tools: Optional[List[Dict]] = None) -> str:
-        """Synchronous generation."""
-        pass
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class LLMUsage:
+    """Token usage from an LLM call."""
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    total_tokens: int = 0
+
+
+class BaseLLMProvider:
+    """Abstract base class for LLM providers."""
+
+    def generate(
+        self,
+        prompt: str,
+        system_prompt: Optional[str] = None,
+        tools: Optional[List[Dict]] = None,
+    ) -> Tuple[str, LLMUsage]:
+        """
+        Generate a completion.
         
-    @abstractmethod
-    def calculate_cost(self, prompt: str, completion_text: str) -> float:
-        """Estimate cost of the call."""
-        pass
+        Returns:
+            Tuple of (response_text, usage)
+        """
+        raise NotImplementedError
+
+    def calculate_cost(self, usage: LLMUsage) -> float:
+        """Calculate cost from actual token usage."""
+        raise NotImplementedError
+
 
 class LiteLLMProvider(BaseLLMProvider):
+    """
+    Real LLM provider using LiteLLM.
+    Supports OpenAI, Anthropic, Ollama, and 100+ other backends.
+    """
+
     def __init__(self, config: ModelConfig):
         self.config = config
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=30),
+        retry=retry_if_exception_type((
+            litellm.exceptions.RateLimitError,
+            litellm.exceptions.APIConnectionError,
+            litellm.exceptions.ServiceUnavailableError,
+        )),
+        before_sleep=lambda retry_state: logging.getLogger(__name__).warning(
+            f"LLM call failed (attempt {retry_state.attempt_number}), retrying..."
+        ),
+    )
+    def generate(
+        self,
+        prompt: str,
+        system_prompt: Optional[str] = None,
+        tools: Optional[List[Dict]] = None,
+    ) -> Tuple[str, LLMUsage]:
+        """
+        Generate a completion with retry logic.
         
-    def generate(self, prompt: str, system_prompt: Optional[str] = None, tools: Optional[List[Dict]] = None) -> str:
+        Returns:
+            Tuple of (response_text, LLMUsage with actual token counts)
+        
+        Raises:
+            LLMProviderError: If all retries fail
+        """
         messages = []
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
         messages.append({"role": "user", "content": prompt})
-        
-        # Call LiteLLM
-        response = litellm.completion(
-            model=self.config.name,
-            messages=messages,
-            # tools=tools if self.config.supports_tools else None
-        )
-        return response.choices[0].message.content
 
-    def calculate_cost(self, prompt: str, completion_text: str) -> float:
         try:
-            # simple fallback estimation if we don't have exact usage from last call
-            # In production, we'd return (response, usage) from generate()
-            prompt_tokens = len(prompt) / 4
-            completion_tokens = len(completion_text) / 4
+            response = litellm.completion(
+                model=self.config.name,
+                messages=messages,
+            )
+
+            text = response.choices[0].message.content or ""
             
-            # LiteLLM helper if available, or manual math
+            # Extract REAL token usage from the API response
+            usage = LLMUsage(
+                prompt_tokens=getattr(response.usage, "prompt_tokens", 0),
+                completion_tokens=getattr(response.usage, "completion_tokens", 0),
+                total_tokens=getattr(response.usage, "total_tokens", 0),
+            )
+
+            logger.debug(
+                f"LLM call: model={self.config.name}, "
+                f"tokens={usage.total_tokens}, "
+                f"prompt={usage.prompt_tokens}, completion={usage.completion_tokens}"
+            )
+
+            return text, usage
+
+        except (litellm.exceptions.RateLimitError,
+                litellm.exceptions.APIConnectionError,
+                litellm.exceptions.ServiceUnavailableError):
+            # Let tenacity handle these (re-raise for retry)
+            raise
+        except Exception as e:
+            logger.error(f"LLM call failed: {self.config.name}: {e}")
+            raise LLMProviderError(
+                message=f"LLM generation failed: {e}",
+                provider=self.config.provider,
+                model=self.config.name,
+            ) from e
+
+    def calculate_cost(self, usage: LLMUsage) -> float:
+        """
+        Calculate cost from REAL token usage (not estimates).
+        
+        Uses the actual prompt_tokens and completion_tokens from the API response.
+        """
+        try:
             cost = litellm.completion_cost(
-                model=self.config.name, 
-                completion_response=None, # Cannot calc exact without response obj
-                prompt_tokens=prompt_tokens,
-                completion_tokens=completion_tokens
+                model=self.config.name,
+                prompt_tokens=usage.prompt_tokens,
+                completion_tokens=usage.completion_tokens,
             )
             return cost
-        except:
-            # Fallback manual calculation based on config
-            p_cost = (len(prompt)/4) / 1_000_000 * self.config.cost_per_million_input_tokens
-            c_cost = (len(completion_text)/4) / 1_000_000 * self.config.cost_per_million_output_tokens
+        except (ValueError, KeyError) as e:
+            # Fallback: manual calculation from config rates
+            logger.warning(f"LiteLLM cost lookup failed for {self.config.name}, using config rates: {e}")
+            p_cost = (usage.prompt_tokens / 1_000_000) * self.config.cost_per_million_input_tokens
+            c_cost = (usage.completion_tokens / 1_000_000) * self.config.cost_per_million_output_tokens
             return p_cost + c_cost
