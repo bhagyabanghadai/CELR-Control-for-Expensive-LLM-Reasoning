@@ -13,10 +13,12 @@ authors = [
 requires-python = ">=3.10"
 dependencies = [
     "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",  # For CELRConfig (BaseSettings)
     "litellm>=1.0.0",
     "rich>=13.0.0",
     "python-dotenv>=1.0.0",
     "networkx>=3.0",  # For DAG handling in plans
+    "tenacity>=8.0.0",  # Retry with exponential backoff for LLM calls
 ]
 
 [project.scripts]

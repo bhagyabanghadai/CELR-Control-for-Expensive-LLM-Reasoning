@@ -16,6 +16,11 @@ class StepType(str, Enum):
     EXECUTION = "EXECUTION"  # Tool use
     VERIFICATION = "VERIFICATION" # Checking result
 
+class EscalationTier(str, Enum):
+    LOCAL = "LOCAL"              # Free local model (Ollama)
+    CHEAP_REMOTE = "CHEAP_REMOTE"  # Cheap cloud (GPT-4o-mini, Claude Haiku)
+    EXPENSIVE_REMOTE = "EXPENSIVE_REMOTE"  # Full power (GPT-4o, Claude Sonnet)
+
 class Step(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     description: str
@@ -31,6 +36,11 @@ class Step(BaseModel):
     estimated_difficulty: float = 0.5 # 0.0 to 1.0
     cost_usd: float = 0.0
     verification_notes: Optional[str] = None
+    
+    # Retry tracking (for verify-then-reflect loop)
+    retry_count: int = 0
+    max_retries: int = 3
+    escalation_tier: Optional[str] = None  # Which tier handled this step
 
 class Plan(BaseModel):
     items: List[Step]
