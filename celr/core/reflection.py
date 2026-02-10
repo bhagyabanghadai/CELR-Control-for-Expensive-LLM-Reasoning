@@ -1,5 +1,9 @@
+import logging
+
 from celr.core.types import Step, TaskContext
 from celr.core.llm import BaseLLMProvider
+
+logger = logging.getLogger(__name__)
 
 class SelfReflection:
     def __init__(self, llm: BaseLLMProvider):
@@ -23,8 +27,9 @@ class SelfReflection:
         Be concise.
         """
         
-        analysis = self.llm.generate(prompt)
+        analysis, usage = self.llm.generate(prompt)
         context.log(f"Reflection on Step {step.id}: {analysis}")
+        logger.info(f"Reflection analysis for step {step.id} ({usage.total_tokens} tokens)")
         return analysis
 
     def should_retry(self, step: Step, attempt_count: int) -> bool:
