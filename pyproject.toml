@@ -1,0 +1,26 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "celr"
+version = "0.1.0"
+description = "Control for Expensive LLM Reasoning - A meta-brain for AI agents."
+readme = "README.md"
+authors = [
+    { name = "Bhagya Banghadai", email = "bhagya@example.com" },
+]
+requires-python = ">=3.10"
+dependencies = [
+    "pydantic>=2.0.0",
+    "litellm>=1.0.0",
+    "rich>=13.0.0",
+    "python-dotenv>=1.0.0",
+    "networkx>=3.0",  # For DAG handling in plans
+]
+
+[project.scripts]
+celr = "celr.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["celr"]
