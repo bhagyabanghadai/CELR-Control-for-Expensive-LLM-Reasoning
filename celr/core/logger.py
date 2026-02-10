@@ -1,7 +1,10 @@
 import json
+import logging
 import os
 from datetime import datetime
 from celr.core.types import TaskContext, Plan
+
+logger = logging.getLogger(__name__)
 
 class TrajectoryLogger:
     def __init__(self, log_dir: str = ".celr_logs"):
@@ -42,3 +45,4 @@ class TrajectoryLogger:
             f.write(json.dumps(data) + "\n")
             
         context.log(f"Trajectory saved to {filepath}")
+        logger.info(f"Trajectory saved: {filepath}")
