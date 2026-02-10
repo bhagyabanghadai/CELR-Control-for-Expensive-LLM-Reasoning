@@ -1,6 +1,9 @@
 import json
+import logging
 import os
 from typing import List, Dict
+
+logger = logging.getLogger(__name__)
 
 class Trainer:
     """
@@ -25,8 +28,8 @@ class Trainer:
                             record = json.loads(line)
                             if record.get("final_status") == "SUCCESS":
                                 data.append(record)
-                        except:
-                            pass
+                        except json.JSONDecodeError as e:
+                            logger.warning(f"Skipping malformed line in {filename}: {e}")
         return data
 
     def export_to_sharegpt(self, output_file: str = "celr_finetune_data.json"):
