@@ -88,14 +88,15 @@ class EscalationManager:
 
         logger.info(f"EscalationManager initialized with {len(self.tiers)} model tiers")
 
-    def select_model(self, step: Step) -> str:
+    def select_model(self, step: Step, force_expensive: bool = False) -> str:
         """
         Returns the name of the model to use for this step.
         
         Decision logic:
           1. Budget safety check
-          2. Budget drain loophole mitigation
-          3. Difficulty-based routing
+          2. Forced Escalation (Cortex Override)
+          3. Budget drain loophole mitigation
+          4. Difficulty-based routing
         """
         remaining = self.tracker.check_remaining_budget()
 
@@ -104,7 +105,16 @@ class EscalationManager:
             logger.warning("Budget exhausted, forcing cheapest model")
             return self.tiers[0].name
 
-        # 2. Budget drain mitigation — save money for hard steps
+        # 2. Forced Escalation (Adaptive Cortex Decision)
+        if force_expensive:
+            if self.tracker.can_afford(self.min_budget_for_escalation):
+                logger.info("Adaptive Cortex forced escalation -> Expensive Model")
+                return self.tiers[-1].name
+            else:
+                logger.warning("Cortex requested escalation but budget too low. Using cheapest.")
+                return self.tiers[0].name
+
+        # 3. Budget drain mitigation — save money for hard steps
         if remaining < 2 * self.min_budget_for_escalation:
             if step.estimated_difficulty > self.difficulty_threshold_mid:
                 logger.info(
@@ -112,7 +122,7 @@ class EscalationManager:
                 )
                 return self.tiers[-1].name
 
-        # 3. Standard difficulty-based routing
+        # 4. Standard difficulty-based routing
         if step.estimated_difficulty >= self.difficulty_threshold_high:
             if self.tracker.can_afford(self.min_budget_for_escalation):
                 return self.tiers[-1].name  # Expensive
@@ -131,12 +141,12 @@ class EscalationManager:
         """Get the tier label for a model name."""
         return self._tier_map.get(model_name, EscalationTier.LOCAL)
 
-    def get_provider(self, step: Step) -> BaseLLMProvider:
+    def get_provider(self, step: Step, force_expensive: bool = False) -> BaseLLMProvider:
         """
         Select model AND return an actual LiteLLMProvider instance.
         This is the main method the executor should call.
         """
-        model_name = self.select_model(step)
+        model_name = self.select_model(step, force_expensive=force_expensive)
         tier = self.get_tier(model_name)
         step.assigned_agent = model_name
         step.escalation_tier = tier.value

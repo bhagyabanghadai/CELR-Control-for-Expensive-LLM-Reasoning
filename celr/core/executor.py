@@ -30,6 +30,8 @@ from celr.core.reflection import SelfReflection
 from celr.core.tools import ToolRegistry
 from celr.core.types import Plan, Step, StepType, TaskContext, TaskStatus
 from celr.core.verifier import Verifier
+from celr.cortex import StateExtractor, MetaPolicy
+from celr.cortex.policy import CortexAction # Explicit import
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +60,11 @@ class TaskExecutor:
         self.tools = tool_registry
         self.verifier = verifier
         self.reflection = reflection
+        
+        # Phase 8: Adaptive Cortex
+        self.state_extractor = StateExtractor()
+        self.policy = MetaPolicy()
+        self.current_plan: Optional[Plan] = None
 
     def run(self, plan: Plan) -> str:
         """
@@ -72,6 +79,7 @@ class TaskExecutor:
         """
         self.context.log("Starting execution loop...")
         logger.info(f"Executing plan with {len(plan.items)} steps")
+        self.current_plan = plan # For Cortex state extraction
 
         while True:
             runnable_steps = self.planner.get_ready_steps(plan)
@@ -126,7 +134,45 @@ class TaskExecutor:
                 logger.info(f"Retry {attempt}/{step.max_retries} for step {step.id}")
 
             try:
-                # 1. Budget check
+                # --- Phase 8: Adaptive Cortex Decision ---
+                # 1. Extract State
+                current_plan_idx = 0 
+                if self.current_plan:
+                    try:
+                        current_plan_idx = [s.id for s in self.current_plan.items].index(step.id)
+                    except ValueError:
+                        pass
+                
+                state = self.state_extractor.extract(
+                    self.context, 
+                    self.current_plan, 
+                    current_step_idx=current_plan_idx, 
+                    retry_count=attempt
+                )
+                
+                # 2. Get Action from Policy
+                action = self.policy.get_action(state)
+                logger.info(f"Cortex Action for step {step.id}: {action}")
+
+                force_expensive = False
+                
+                if action == CortexAction.ABORT:
+                    self.context.log(f"🛑 Cortex aborted step {step.id} (Safety/Cost risk)")
+                    logger.warning("Cortex triggered ABORT")
+                    step.status = TaskStatus.FAILED
+                    break # Stop retries
+                
+                elif action == CortexAction.ESCALATE:
+                    self.context.log("⚡ Cortex triggered ESCALATION (forcing stronger model)")
+                    force_expensive = True
+                
+                elif action == CortexAction.STOP:
+                    # Rare case: Early success prediction? 
+                    # For now, treat as "skip execution if we think we assume success", 
+                    # but mostly this action is for higher level loops.
+                    pass
+
+                # 3. Budget check (Legacy safety net)
                 estimated_cost = 0.01
                 if not self.tracker.can_afford(estimated_cost):
                     raise BudgetExhaustedError(
@@ -135,8 +181,15 @@ class TaskExecutor:
                         step_description=step.description,
                     )
 
-                # 2. Dispatch (route + execute)
-                result = self._dispatch(step)
+                # 4. Dispatch (route + execute)
+                # Pass force_expensive flag if Cortex requested escalation
+                if step.step_type == StepType.EXECUTION:
+                     # Tools don't use LLM provider directly in dispatch_tool yet, 
+                     # but _get_code_from_llm does.
+                     result = self._dispatch_tool(step, force_expensive)
+                else:
+                     result = self._dispatch_llm(step, force_expensive)
+                
                 step.output = result
 
                 # 3. Verify
@@ -198,7 +251,7 @@ class TaskExecutor:
         else:
             return self._dispatch_llm(step)
 
-    def _dispatch_tool(self, step: Step) -> str:
+    def _dispatch_tool(self, step: Step, force_expensive: bool = False) -> str:
         """Execute a tool-based step."""
         # Extract tool name and code from description
         # Convention: step description starts with "TOOL:tool_name:" for tool steps
@@ -209,16 +262,16 @@ class TaskExecutor:
         else:
             # Default: ask LLM for code, then execute
             tool_name = "python_repl"
-            code = self._get_code_from_llm(step)
+            code = self._get_code_from_llm(step, force_expensive=force_expensive)
 
         self.context.log(f"Dispatching to tool: {tool_name}")
         result = self.tools.execute(tool_name, code=code)
         return result
 
-    def _dispatch_llm(self, step: Step) -> str:
+    def _dispatch_llm(self, step: Step, force_expensive: bool = False) -> str:
         """Execute a reasoning/verification step via LLM."""
         # Get the right provider based on difficulty + budget
-        provider = self.escalation.get_provider(step)
+        provider = self.escalation.get_provider(step, force_expensive=force_expensive)
 
         prompt = (
             f"Task: {step.description}\n\n"
@@ -240,9 +293,9 @@ class TaskExecutor:
 
         return text
 
-    def _get_code_from_llm(self, step: Step) -> str:
+    def _get_code_from_llm(self, step: Step, force_expensive: bool = False) -> str:
         """Ask LLM to generate executable code for a tool step."""
-        provider = self.escalation.get_provider(step)
+        provider = self.escalation.get_provider(step, force_expensive=force_expensive)
         prompt = (
             f"Generate Python code to accomplish this task:\n{step.description}\n\n"
             f"Return ONLY the code, no explanation."
@@ -250,4 +303,9 @@ class TaskExecutor:
         code, usage = provider.generate(prompt)
         cost = provider.calculate_cost(usage)
         self.tracker.add_cost(cost)
+        
+        # Strip markdown formatting if present
+        if "```" in code:
+            code = code.replace("```python", "").replace("```py", "").replace("```", "").strip()
+            
         return code
