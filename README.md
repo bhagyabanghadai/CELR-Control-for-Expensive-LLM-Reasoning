@@ -79,7 +79,7 @@ CELR implements an **Offline RL Controller** (Adaptive Cortex) that learns a pol
 ```mermaid
 graph TD
     User[User Prompt + Budget] --> Controller
-    Controller --> Planner[Local "Small" Brain]
+    Controller --> Planner[Local Small Brain]
     Planner --> Plan[Execution Plan (DAG)]
     Plan --> Executor
     
