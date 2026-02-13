@@ -1,0 +1,16 @@
+CELR Chat Session — 2026-02-13_00-05-47
+Model: Ollama — llama3 (Local, Free)
+Budget Limit: $1.0
+Final Cost:   $0.0
+--------------------------------------------------
+
+[USER]
+hello
+
+--------------------
+
+[ASSISTANT]
+I am a test bot response
+
+--------------------
+
