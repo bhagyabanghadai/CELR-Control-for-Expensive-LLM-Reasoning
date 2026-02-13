@@ -7,7 +7,8 @@ from celr.core.prompts import DECOMPOSITION_SYSTEM_PROMPT, DIFFICULTY_ESTIMATION
 from celr.core.exceptions import PlanningError
 
 logger = logging.getLogger(__name__)
-from celr.core.prompts import DECOMPOSITION_SYSTEM_PROMPT, DIFFICULTY_ESTIMATION_PROMPT
+
+
 
 class ReasoningCore:
     def __init__(self, llm: BaseLLMProvider):
@@ -23,8 +24,15 @@ class ReasoningCore:
         )
         
         try:
-            # Clean up potential markdown code blocks
-            clean_response = response.replace("```json", "").replace("```", "").strip()
+            # Robust extraction of JSON object/array
+            import re
+            json_match = re.search(r'(\{.*\}|\[.*\])', response, re.DOTALL)
+            if json_match:
+                clean_response = json_match.group(1)
+            else:
+                # Fallback to basic stripping if regex fails
+                clean_response = response.replace("```json", "").replace("```", "").strip()
+                
             data = json.loads(clean_response)
             
             # Convert JSON items to Step objects
@@ -52,7 +60,13 @@ class ReasoningCore:
         response, usage = self.llm.generate(prompt=prompt)
         
         try:
-            clean = response.replace("```json", "").replace("```", "").strip()
+            import re
+            json_match = re.search(r'(\{.*\}|\[.*\])', response, re.DOTALL)
+            if json_match:
+                clean = json_match.group(1)
+            else:
+                clean = response.replace("```json", "").replace("```", "").strip()
+                
             data = json.loads(clean)
             return float(data.get("difficulty_score", 0.5))
         except (json.JSONDecodeError, ValueError, TypeError) as e:
