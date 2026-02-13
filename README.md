@@ -64,7 +64,7 @@ For scripted or automation tasks, use the CLI directly:
 
 **It’s not about better text. It’s about better decisions.**
 
-Most agents fail because they don't know *when* to stop, *when* to verifying, or *how* to spend their budget.
+Most agents fail because they don't know *when* to stop, *when* to verify, or *how* to spend their budget.
 CELR implements an **Offline RL Controller** (Adaptive Cortex) that learns a policy from your execution logs.
 
 1.  **Observe:** Budget, Risk, Difficulty, History.
