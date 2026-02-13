@@ -1,0 +1,121 @@
+{
+  "model": "ollama/llama3",
+  "budget": 0.1,
+  "timestamp": "2026-02-13 00:45:41",
+  "celr_results": [
+    {
+      "task_id": "easy_math_1",
+      "method": "celr",
+      "prompt": "What is 15 multiplied by 7? Provide only the numeric answer.",
+      "output": "completion_cost() got an unexpected keyword argument 'prompt_tokens'",
+      "success": false,
+      "accuracy": false,
+      "cost_usd": 0.0,
+      "latency_s": 4.686822414398193,
+      "escalation_count": 0,
+      "steps_executed": 1,
+      "retries": 3,
+      "error": ""
+    },
+    {
+      "task_id": "easy_code_1",
+      "method": "celr",
+      "prompt": "Write a Python function called `add` that takes two numbers and returns their sum.",
+      "output": "completion_cost() got an unexpected keyword argument 'prompt_tokens'",
+      "success": false,
+      "accuracy": false,
+      "cost_usd": 0.0,
+      "latency_s": 8.110534429550171,
+      "escalation_count": 0,
+      "steps_executed": 2,
+      "retries": 3,
+      "error": ""
+    },
+    {
+      "task_id": "easy_general_1",
+      "method": "celr",
+      "prompt": "What is the capital of France? Answer in one word.",
+      "output": "completion_cost() got an unexpected keyword argument 'prompt_tokens'",
+      "success": false,
+      "accuracy": false,
+      "cost_usd": 0.0,
+      "latency_s": 12.153413772583008,
+      "escalation_count": 0,
+      "steps_executed": 2,
+      "retries": 3,
+      "error": ""
+    },
+    {
+      "task_id": "easy_reasoning_1",
+      "method": "celr",
+      "prompt": "If all cats are animals, and Whiskers is a cat, what can you conclude about Whiskers?",
+      "output": "completion_cost() got an unexpected keyword argument 'prompt_tokens'",
+      "success": false,
+      "accuracy": false,
+      "cost_usd": 0.0,
+      "latency_s": 16.90911078453064,
+      "escalation_count": 0,
+      "steps_executed": 2,
+      "retries": 3,
+      "error": ""
+    }
+  ],
+  "direct_results": [
+    {
+      "task_id": "easy_math_1",
+      "method": "direct",
+      "prompt": "What is 15 multiplied by 7? Provide only the numeric answer.",
+      "output": "105",
+      "success": false,
+      "accuracy": false,
+      "cost_usd": 0.0,
+      "latency_s": 6.45002293586731,
+      "escalation_count": 0,
+      "steps_executed": 0,
+      "retries": 0,
+      "error": "completion_cost() got an unexpected keyword argument 'prompt_tokens'"
+    },
+    {
+      "task_id": "easy_code_1",
+      "method": "direct",
+      "prompt": "Write a Python function called `add` that takes two numbers and returns their sum.",
+      "output": "Here is the Python function you requested:\n\n```Python\ndef add(a, b):\n    return a + b\n```\n\nYou can use this function to add two numbers like this:\n\n```Python\nprint(add(3, 5))  # Outputs: 8\n```",
+      "success": false,
+      "accuracy": false,
+      "cost_usd": 0.0,
+      "latency_s": 1.6574478149414062,
+      "escalation_count": 0,
+      "steps_executed": 0,
+      "retries": 0,
+      "error": "completion_cost() got an unexpected keyword argument 'prompt_tokens'"
+    },
+    {
+      "task_id": "easy_general_1",
+      "method": "direct",
+      "prompt": "What is the capital of France? Answer in one word.",
+      "output": "Paris.",
+      "success": false,
+      "accuracy": false,
+      "cost_usd": 0.0,
+      "latency_s": 0.49857449531555176,
+      "escalation_count": 0,
+      "steps_executed": 0,
+      "retries": 0,
+      "error": "completion_cost() got an unexpected keyword argument 'prompt_tokens'"
+    },
+    {
+      "task_id": "easy_reasoning_1",
+      "method": "direct",
+      "prompt": "If all cats are animals, and Whiskers is a cat, what can you conclude about Whiskers?",
+      "output": "A classic logical reasoning question!\n\nGiven:\n\n1. All cats are animals.\n2. Whiskers is a cat.\n\nWe can conclude that:\n\n**Whiskers is an animal.**\n\nThe reason is straightforward: since all cats are animals, and Whiskers is a cat, it follows that Whiskers must be an animal.",
+      "success": false,
+      "accuracy": false,
+      "cost_usd": 0.0,
+      "latency_s": 1.895561933517456,
+      "escalation_count": 0,
+      "steps_executed": 0,
+      "retries": 0,
+      "error": "completion_cost() got an unexpected keyword argument 'prompt_tokens'"
+    }
+  ]
+}

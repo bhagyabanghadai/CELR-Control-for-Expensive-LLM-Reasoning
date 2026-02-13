@@ -1,0 +1,45 @@
+CELR Chat Session — 2026-02-13_16-00-36
+Model: Ollama — llama3.2 (Local, Free)
+Budget Limit: $999999.0
+Final Cost:   $0.0
+--------------------------------------------------
+
+[USER]
+hello how are you
+
+--------------------
+
+[ASSISTANT]
+I'm doing well, thank you for asking! How can I assist you today?
+
+--------------------
+
+[USER]
+compare TCP vs UDP and explain key differences
+
+--------------------
+
+[ASSISTANT]
+**TCP vs UDP: Key Differences**
+
+Transmission Control Protocol (TCP) and User Datagram Protocol (UDP) are two fundamental protocols used for data transmission over the internet. While both protocols have their uses, they differ significantly in terms of reliability, latency, and packet structure.
+
+**Key Differences:**
+
+1.  **Reliability:** TCP is a connection-oriented protocol that guarantees delivery of packets. It ensures that data is delivered in the correct order and reassembles packets at the receiving end if they arrive out of sequence. On the other hand, UDP is a connectionless protocol that does not guarantee delivery of packets. If packets are lost or corrupted during transmission, UDP does not retransmit them.
+2.  **Latency:** TCP has higher latency compared to UDP due to its slower data transfer rate and need for packet reassembly at the receiving end. UDP, on the other hand, prioritizes speed over reliability, resulting in lower latency.
+3.  **Packet Structure:** TCP uses a more complex packet structure that includes headers with sequence numbers, acknowledgment numbers, and checksums. This adds overhead to each packet. In contrast, UDP packets have simpler headers without these additional fields.
+4.  **Flow Control:** TCP regulates the amount of data sent by a sender in a given time period through flow control mechanisms like congestion avoidance algorithms.
+
+**Use Cases:**
+
+*   **TCP:**
+    *   Suitable for applications that require guaranteed delivery and reliability, such as file transfers, email services, and web browsing.
+    *   Ideal for real-time applications where packet loss or latency would be detrimental, like video conferencing, voice over IP (VoIP), and online gaming.
+
+*   **UDP:**
+    *   Typically used in applications that require low latency and can tolerate some degree of packet loss, such as streaming media, online multiplayer games, and voice chat services.
+    *   Also useful for broadcast communications where packets may be lost or duplicated without significant impact on the overall experience.
+
+--------------------
+
