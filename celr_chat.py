@@ -530,6 +530,12 @@ def create_chat_engine(model_info, budget):
 
 def test_connection(provider, model_name):
     """Send a tiny test message to verify the model works."""
+    # For free/local models, skip strict connection test or handle gracefully
+    if "ollama" in model_name.lower():
+        # Skip connection test for local models to avoid cost calc issues
+        return True, None
+
+    # For paid models, try a test generation
     try:
         if HAS_RICH:
             with ui.console.status("[bold cyan]  Testing connection...", spinner="dots"):
@@ -584,17 +590,21 @@ def chat_loop(provider, context, tracker, model_info):
         # -- Commands --
         if user_input.startswith("/"):
             cmd = user_input.lower().split()[0]
+            args = user_input[len(cmd):].strip()
 
             if cmd in ("/exit", "/quit", "/bye", "/q"):
+                save_chat_log(conversation_history, model_name, context)
                 break
             elif cmd == "/help":
                 print()
                 ui.info("  Commands:")
-                ui.info("    /help   — Show this help")
-                ui.info("    /cost   — Show spending")
-                ui.info("    /clear  — New conversation")
-                ui.info("    /model  — Current model info")
-                ui.info("    /exit   — End session")
+                ui.info("    /help          — Show this help")
+                ui.info("    /cost          — Show spending")
+                ui.info("    /clear         — New conversation")
+                ui.info("    /model         — Current model info")
+                ui.info("    /system <text> — Change AI persona")
+                ui.info("    /save          — Save chat to file")
+                ui.info("    /exit          — End session")
                 print()
                 continue
             elif cmd == "/cost":
@@ -608,15 +618,34 @@ def chat_loop(provider, context, tracker, model_info):
                 print()
                 continue
             elif cmd == "/clear":
+                # Auto-save before clearing
+                if conversation_history:
+                    save_chat_log(conversation_history, model_name, context)
                 conversation_history.clear()
                 message_count = 0
-                ui.success("  Conversation cleared!")
+                ui.success("  Conversation cleared (previous saved to logs/).")
                 print()
                 continue
             elif cmd == "/model":
                 ui.info(f"  Model: {model_name}")
                 ui.info(f"  Provider: {model_info['provider']}")
                 ui.info(f"  Cost: {model_info['cost_info']}")
+                ui.info(f"  System Prompt: {system_prompt}")
+                print()
+                continue
+            elif cmd == "/system":
+                if not args:
+                    ui.info(f"  Current System Prompt: {system_prompt}")
+                    ui.info("  Usage: /system You are a pirate")
+                else:
+                    system_prompt = args
+                    ui.success("  System prompt updated!")
+                    ui.info(f"  New persona: {system_prompt}")
+                print()
+                continue
+            elif cmd == "/save":
+                path = save_chat_log(conversation_history, model_name, context)
+                ui.success(f"  Chat saved to: {path}")
                 print()
                 continue
             else:
@@ -650,9 +679,15 @@ def chat_loop(provider, context, tracker, model_info):
                 response, usage = provider.generate(prompt=full_prompt, system_prompt=system_prompt)
 
             elapsed = time.time() - start
-            cost = provider.calculate_cost(usage)
+            
+            cost = 0.0
             if not is_free:
-                tracker.add_cost(cost)
+                try:
+                    cost = provider.calculate_cost(usage)
+                    tracker.add_cost(cost)
+                except Exception:
+                    pass  # Ignore cost calc errors for chat display
+            
             message_count += 1
 
             conversation_history.append({"role": "assistant", "content": response})
@@ -739,6 +774,42 @@ def show_summary(context, message_count, model_info):
     print()
     ui.info("  Thanks for using CELR!")
     print()
+
+
+# ─── Validating & Saving ──────────────────────────────────────────
+
+def save_chat_log(history, model_name, context):
+    """Save conversation to a timestamped file."""
+    if not history:
+        return None
+
+    # Ensure directory exists
+    log_dir = os.path.join(os.getcwd(), "logs", "chats")
+    os.makedirs(log_dir, exist_ok=True)
+
+    # Filename: chat_2023-10-27_15-30-00.txt
+    timestamp = time.strftime("%Y-%m-%d_%H-%M-%S")
+    filename = f"chat_{timestamp}.txt"
+    filepath = os.path.join(log_dir, filename)
+
+    try:
+        with open(filepath, "w", encoding="utf-8") as f:
+            f.write(f"CELR Chat Session — {timestamp}\n")
+            f.write(f"Model: {model_name}\n")
+            f.write(f"Budget Limit: ${context.budget_limit_usd}\n")
+            f.write(f"Final Cost:   ${context.current_spread_usd}\n")
+            f.write("-" * 50 + "\n\n")
+
+            for msg in history:
+                role = msg["role"].upper()
+                content = msg["content"]
+                f.write(f"[{role}]\n{content}\n\n")
+                f.write("-" * 20 + "\n\n")
+        
+        return filepath
+    except Exception as e:
+        ui.error(f"Failed to save chat log: {e}")
+        return None
 
 
 # ─── Main ─────────────────────────────────────────────────────────
