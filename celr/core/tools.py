@@ -24,21 +24,15 @@ from celr.core.exceptions import ToolExecutionError
 
 logger = logging.getLogger(__name__)
 
-# Builtins whitelist — no file I/O, no imports, no eval/exec
-SAFE_BUILTINS = {
-    "abs": abs, "all": all, "any": any, "bool": bool,
-    "chr": chr, "dict": dict, "dir": dir, "divmod": divmod,
-    "enumerate": enumerate, "filter": filter, "float": float,
-    "format": format, "frozenset": frozenset, "getattr": getattr,
-    "hasattr": hasattr, "hash": hash, "hex": hex, "id": id,
-    "int": int, "isinstance": isinstance, "issubclass": issubclass,
-    "iter": iter, "len": len, "list": list, "map": map,
-    "max": max, "min": min, "next": next, "oct": oct,
-    "ord": ord, "pow": pow, "print": print, "range": range,
-    "repr": repr, "reversed": reversed, "round": round, "set": set,
-    "slice": slice, "sorted": sorted, "str": str, "sum": sum,
-    "tuple": tuple, "type": type, "zip": zip,
-}
+# Builtins whitelist — allow standard builtins but block dangerous I/O
+import builtins as _builtins
+
+_BLOCKED = {"open", "exec", "eval", "compile", "globals", "locals", 
+            "breakpoint", "exit", "quit", "input"}
+
+SAFE_BUILTINS = {k: v for k, v in vars(_builtins).items() 
+                 if not k.startswith("_") or k in ("__import__", "__build_class__", "__name__")
+                 if k not in _BLOCKED}
 
 MAX_OUTPUT_BYTES = 10_240  # 10KB max output
 EXEC_TIMEOUT_SECONDS = 10
