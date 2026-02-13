@@ -33,43 +33,32 @@ cd CELR
 pip install -r requirements.txt
 ```
 
-### 3. Quick Start (No API Keys Needed)
-Run the **Live Demo** to see the system in action using a mock LLM:
-```batch
-run_demo.bat
-```
-This runs a simulated task ("Write Hello World"), showing planning, execution, verification, and cost tracking.
+### 3. Quick Start (Interactive Chat)
+The easiest way to use CELR is the interactive chat interface. It auto-detects your API keys or local Ollama models.
 
-### 4. Interactive Chat (Recommended)
-Talk to AI in your terminal — no coding needed:
-```bash
-python celr_chat.py
-```
-You'll see a menu to:
-1. **Pick your AI** (GPT-4o, Claude, Groq, or local Ollama)
-2. **Set a budget** (e.g., $0.50)
-3. **Start chatting** — just type naturally
+1.  **Launch it:**
+    *   **Windows:** Double-click `run_chat.bat`
+    *   **Mac/Linux:** Run `./run_chat.sh`
+    *   **Manual:** `python celr_chat.py`
 
-Commands: `/help`, `/cost`, `/clear`, `/exit`
+2.  **Pick your AI:**
+    *   Select **Ollama** (free, local)
+    *   Or cloud models (GPT-4o, Claude, Groq)
 
-### 5. Running with Ollama (Local)
-To run fully local using Llama 3 (or any other model):
-1.  Ensure Ollama is running (`ollama serve`).
-2.  Pull the model (`ollama pull llama3`).
-3.  Run the helper script:
-    ```batch
-    run_ollama.bat
-    ```
-    This forces CELR to use your local model for everything.
+3.  **Start chatting!**
+    *   Type `/system You cover code like a pirate` to change persona.
+    *   Type `/save` to save your conversation to `logs/chats/`.
 
-### 6. Running with Real APIs
-To use OpenAI, Anthropic, or Groq:
+### 4. Running with Real APIs (CLI)
+For scripted or automation tasks, use the CLI directly:
+
 1.  Copy `.env.example` to `.env`.
 2.  Add your keys (`OPENAI_API_KEY=sk-...`).
-3.  Run the CLI:
+3.  Run a specific task:
     ```bash
     python -m celr.cli "Write a snake game in Python" --budget 0.50
     ```
+
 
 ## 🧠 Phase 8: Adaptive Cortex (Meta-Learning Control) 🆕
 
