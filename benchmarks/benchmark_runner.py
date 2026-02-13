@@ -23,7 +23,7 @@ from typing import List, Optional
 from unittest.mock import patch
 
 from celr.core.config import CELRConfig
-from celr.core.types import TaskContext, TaskStatus
+from celr.core.types import TaskContext, TaskStatus, ModelConfig
 from celr.core.cost_tracker import CostTracker
 from celr.core.reasoning import ReasoningCore
 from celr.core.planner import Planner
@@ -132,12 +132,30 @@ def check_accuracy(output: str, expected_contains: List[str]) -> bool:
     return all(kw.lower() in output_lower for kw in expected_contains)
 
 
+def create_config(model_name: str) -> ModelConfig:
+    """Create a default ModelConfig for the benchmark."""
+    is_ollama = model_name.startswith("ollama") or model_name.startswith("local")
+    provider = "ollama" if is_ollama else "openai"
+    
+    # Use 0 cost for local, standard rates for others (fallback)
+    cost_in = 0.0 if is_ollama else 0.15 # gpt-4o-mini approx
+    cost_out = 0.0 if is_ollama else 0.60
+    
+    return ModelConfig(
+        name=model_name,
+        provider=provider,
+        cost_per_million_input_tokens=cost_in,
+        cost_per_million_output_tokens=cost_out,
+    )
+
+
 def run_direct(task: dict, model: str) -> TaskResult:
     """Run task with a DIRECT LLM call — no CELR overhead."""
     result = TaskResult(task_id=task["id"], method="direct", prompt=task["prompt"])
 
     try:
-        provider = LiteLLMProvider(model_name=model)
+        config = create_config(model)
+        provider = LiteLLMProvider(config=config)
         start = time.time()
         response, usage = provider.generate(task["prompt"])
         result.latency_s = time.time() - start
@@ -169,7 +187,8 @@ def run_celr(task: dict, model: str, budget: float) -> TaskResult:
             budget_limit_usd=config.budget_limit,
         )
 
-        provider = LiteLLMProvider(model_name=model)
+        llm_config = create_config(model)
+        provider = LiteLLMProvider(config=llm_config)
         tracker = CostTracker(context)
         escalation = EscalationManager(tracker, config.get_model_tiers())
         tools = ToolRegistry()
