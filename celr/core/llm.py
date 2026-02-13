@@ -136,6 +136,43 @@ class LiteLLMProvider(BaseLLMProvider):
                 model=self.config.name,
             ) from e
 
+    def generate_chat(
+        self,
+        messages: List[Dict[str, str]],
+    ) -> Tuple[str, "LLMUsage"]:
+        """
+        Generate a completion from a proper messages array (multi-turn).
+        
+        Args:
+            messages: List of {"role": "system"|"user"|"assistant", "content": "..."}
+        
+        Returns:
+            Tuple of (response_text, LLMUsage)
+        """
+        try:
+            response = litellm.completion(
+                model=self.config.name,
+                messages=messages,
+            )
+
+            text = response.choices[0].message.content or ""
+            
+            usage = LLMUsage(
+                prompt_tokens=getattr(response.usage, "prompt_tokens", 0),
+                completion_tokens=getattr(response.usage, "completion_tokens", 0),
+                total_tokens=getattr(response.usage, "total_tokens", 0),
+            )
+
+            return text, usage
+
+        except Exception as e:
+            logger.error(f"LLM chat call failed: {self.config.name}: {e}")
+            raise LLMProviderError(
+                message=f"LLM generation failed: {e}",
+                provider=self.config.provider,
+                model=self.config.name,
+            ) from e
+
     def calculate_cost(self, usage: LLMUsage) -> float:
         """
         Calculate cost from REAL token usage (not estimates).
