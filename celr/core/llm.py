@@ -142,6 +142,9 @@ class LiteLLMProvider(BaseLLMProvider):
         
         Uses the actual prompt_tokens and completion_tokens from the API response.
         """
+        if self.config.provider == "ollama" or "local" in self.config.name:
+            return 0.0
+
         try:
             cost = litellm.completion_cost(
                 model=self.config.name,
@@ -149,9 +152,8 @@ class LiteLLMProvider(BaseLLMProvider):
                 completion_tokens=usage.completion_tokens,
             )
             return cost
-        except (ValueError, KeyError) as e:
+        except (ValueError, KeyError, TypeError) as e:
             # Fallback: manual calculation from config rates
-            logger.warning(f"LiteLLM cost lookup failed for {self.config.name}, using config rates: {e}")
             p_cost = (usage.prompt_tokens / 1_000_000) * self.config.cost_per_million_input_tokens
             c_cost = (usage.completion_tokens / 1_000_000) * self.config.cost_per_million_output_tokens
             return p_cost + c_cost
