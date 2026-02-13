@@ -80,7 +80,7 @@ CELR implements an **Offline RL Controller** (Adaptive Cortex) that learns a pol
 graph TD
     User[User Prompt + Budget] --> Controller
     Controller --> Planner[Local Small Brain]
-    Planner --> Plan[Execution Plan (DAG)]
+    Planner --> Plan["Execution Plan (DAG)"]
     Plan --> Executor
     
     Executor -->|Easy Step| LocalLLM[Llama 3 / Mistral]
