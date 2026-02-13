@@ -2,6 +2,7 @@ import numpy as np
 from typing import Dict, List, Any
 from celr.core.types import TaskContext, Plan, Step, TaskStatus
 
+
 class StateExtractor:
     """
     Extracts RL state vectors from CELR execution logs.
@@ -29,37 +30,35 @@ class StateExtractor:
         """
         # 1. Budget Remaining
         budget_ratio = 0.0
-        if context.budget_limit > 0:
-            spent = context.cost_tracker.total_cost if hasattr(context, 'cost_tracker') else 0.0
-            remaining = context.budget_limit - spent
-            budget_ratio = max(0.0, remaining / context.budget_limit)
+        if context.budget_limit_usd > 0:
+            remaining = context.budget_limit_usd - context.current_spread_usd
+            budget_ratio = max(0.0, remaining / context.budget_limit_usd)
 
         # 2. Step Progress
         progress_ratio = 0.0
-        if plan and len(plan.steps) > 0:
-            progress_ratio = current_step_idx / len(plan.steps)
+        if plan and len(plan.items) > 0:
+            progress_ratio = current_step_idx / len(plan.items)
 
         # 3. Retry Count
         retry_ratio = min(1.0, retry_count / self.max_retries)
 
-        # 4. Verification Failures (Approximated by total retries for now, or trace analysis)
-        # Ideally, we'd track this in context logs. For now, use retry_ratio.
-        ver_fail_ratio = retry_ratio 
+        # 4. Verification Failures (Approximated by total retries for now)
+        ver_fail_ratio = retry_ratio
 
-        # 5. Difficulty
-        difficulty = 0.5 # Default
-        if plan and hasattr(plan, 'difficulty_score'):
-            difficulty = plan.difficulty_score / 10.0 # Assuming 1-10 scale
-        
+        # 5. Difficulty — extract from current step if available
+        difficulty = 0.5  # Default
+        if plan and plan.items and current_step_idx < len(plan.items):
+            difficulty = plan.items[current_step_idx].estimated_difficulty
+
         # 6. Previous Action (Placeholder)
-        prev_action = 0.0 
+        prev_action = 0.0
 
-        # 7. Time Elapsed (Placeholder - context doesn't track start time explicitly in types yet)
-        # We'll assume start_time is added to context or tracked externally.
-        time_ratio = 0.0 # Placeholder
+        # 7. Time Elapsed (Placeholder — context doesn't track start time yet)
+        time_ratio = 0.0
 
         # 8. Task Type (Heuristic)
-        is_coding = 1.0 if "code" in context.user_prompt.lower() or "python" in context.user_prompt.lower() else 0.0
+        prompt = context.original_request.lower()
+        is_coding = 1.0 if any(kw in prompt for kw in ["code", "python", "script", "function", "class", "program"]) else 0.0
 
         state = np.array([
             budget_ratio,
