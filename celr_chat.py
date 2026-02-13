@@ -1,22 +1,25 @@
 """
 CELR Interactive Chat — Talk to AI in your terminal.
 
-A user-friendly chat interface where anyone can:
-  1. Pick their AI model (OpenAI, Anthropic, Groq, or Local Ollama)
-  2. Set a budget
-  3. Chat back and forth with the AI
-  4. See cost tracking in real-time
+Handles ALL user scenarios:
+  - No API keys, no Ollama          → step-by-step setup guide
+  - Ollama installed but not running → detects and tells user
+  - Ollama running, no model pulled → detects and tells user
+  - Has API key but it's invalid    → catches error, offers re-entry
+  - User doesn't know .env file     → lets them paste key directly
+  - Using free local model           → skips budget question
 
 Usage:
     python celr_chat.py
-
-No coding knowledge needed. Just run and talk.
 """
 
 import os
 import sys
 import time
+import json
 import logging
+import urllib.request
+import urllib.error
 
 from dotenv import load_dotenv
 
@@ -35,21 +38,16 @@ try:
     from rich.panel import Panel
     from rich.table import Table
     from rich.markdown import Markdown
-    from rich.prompt import Prompt, FloatPrompt, IntPrompt
-    from rich.text import Text
     HAS_RICH = True
 except ImportError:
     HAS_RICH = False
 
 
 class ChatUI:
-    """Simple terminal UI that works with or without Rich."""
+    """Terminal UI that works with or without Rich."""
 
     def __init__(self):
-        if HAS_RICH:
-            self.console = Console()
-        else:
-            self.console = None
+        self.console = Console() if HAS_RICH else None
 
     def clear(self):
         os.system("cls" if os.name == "nt" else "clear")
@@ -59,8 +57,7 @@ class ChatUI:
             self.console.print(Panel(
                 "[bold cyan]CELR[/bold cyan] — [white]Control for Expensive LLM Reasoning[/white]\n"
                 "[dim]Your personal AI assistant in the terminal[/dim]",
-                border_style="cyan",
-                padding=(1, 2),
+                border_style="cyan", padding=(1, 2),
             ))
         else:
             print("=" * 55)
@@ -99,17 +96,31 @@ class ChatUI:
         else:
             print(f"WARNING: {text}")
 
-    def ai_response(self, text):
+    def ai_response(self, text, model_name, cost, elapsed, tokens):
+        print()
         if HAS_RICH:
             try:
-                self.console.print(Markdown(text))
+                content = Markdown(text)
             except Exception:
-                self.console.print(text)
+                content = text
+            subtitle = f"[dim]${cost:.4f} | {elapsed:.1f}s | {tokens} tokens[/dim]" if cost > 0 else f"[dim]FREE | {elapsed:.1f}s | {tokens} tokens[/dim]"
+            self.console.print(Panel(
+                content,
+                title=f"[cyan]{model_name}[/cyan]",
+                subtitle=subtitle,
+                border_style="blue", padding=(0, 1),
+            ))
         else:
-            print(text)
+            print(f"  AI: {text}")
+            cost_str = f"${cost:.4f}" if cost > 0 else "FREE"
+            print(f"  [{cost_str} | {elapsed:.1f}s | {tokens} tokens]")
+        print()
 
     def cost_bar(self, spent, budget):
-        pct = min(spent / budget * 100, 100) if budget > 0 else 0
+        if budget <= 0:
+            self.info("  Using free local model - no cost")
+            return
+        pct = min(spent / budget * 100, 100)
         remaining = budget - spent
         if HAS_RICH:
             color = "green" if pct < 50 else "yellow" if pct < 80 else "red"
@@ -124,68 +135,142 @@ class ChatUI:
 ui = ChatUI()
 
 
-# ─── Model Selection ──────────────────────────────────────────────
+# ─── Ollama Detection ─────────────────────────────────────────────
 
-MODELS = {
+def check_ollama_running():
+    """Check if Ollama server is running on localhost."""
+    try:
+        req = urllib.request.Request("http://localhost:11434/api/tags", method="GET")
+        with urllib.request.urlopen(req, timeout=3) as resp:
+            return resp.status == 200
+    except Exception:
+        return False
+
+
+def get_ollama_models():
+    """Get list of models pulled in Ollama."""
+    try:
+        req = urllib.request.Request("http://localhost:11434/api/tags", method="GET")
+        with urllib.request.urlopen(req, timeout=3) as resp:
+            data = json.loads(resp.read().decode())
+            return [m["name"] for m in data.get("models", [])]
+    except Exception:
+        return []
+
+
+# ─── Model Definitions ────────────────────────────────────────────
+
+CLOUD_MODELS = {
     "1": {
-        "name": "GPT-4o Mini",
+        "name": "GPT-4o Mini (Recommended)",
         "model": "gpt-4o-mini",
         "provider": "openai",
         "key_env": "OPENAI_API_KEY",
-        "cost": "~$0.15 / 1M input tokens (very cheap)",
+        "cost_info": "~$0.15/1M tokens (very cheap)",
         "description": "Fast, cheap, great for most tasks",
+        "free": False,
     },
     "2": {
         "name": "GPT-4o",
         "model": "gpt-4o",
         "provider": "openai",
         "key_env": "OPENAI_API_KEY",
-        "cost": "~$5.00 / 1M input tokens (moderate)",
-        "description": "Smartest OpenAI model. Better for complex tasks",
+        "cost_info": "~$5/1M tokens",
+        "description": "Most capable OpenAI model",
+        "free": False,
     },
     "3": {
         "name": "Claude 3.5 Sonnet",
         "model": "claude-3-5-sonnet-20241022",
         "provider": "anthropic",
         "key_env": "ANTHROPIC_API_KEY",
-        "cost": "~$3.00 / 1M input tokens (moderate)",
-        "description": "Excellent for writing, analysis, and coding",
+        "cost_info": "~$3/1M tokens",
+        "description": "Great for writing and analysis",
+        "free": False,
     },
     "4": {
-        "name": "Groq (Llama 3 70B)",
+        "name": "Groq (Llama 3 — Ultra Fast)",
         "model": "groq/llama-3.3-70b-versatile",
         "provider": "groq",
         "key_env": "GROQ_API_KEY",
-        "cost": "~$0.59 / 1M input tokens (cheap + fast)",
-        "description": "Ultra-fast inference. Great speed-to-cost ratio",
-    },
-    "5": {
-        "name": "Ollama (Local)",
-        "model": "ollama/llama3",
-        "provider": "ollama",
-        "key_env": None,
-        "cost": "FREE (runs on your computer)",
-        "description": "100% private, no internet needed. Requires Ollama installed",
+        "cost_info": "~$0.59/1M tokens + blazing fast",
+        "description": "Fastest inference available",
+        "free": False,
     },
 }
 
 
-def detect_available_models():
-    """Check which API keys are set."""
-    available = {}
-    for key, model in MODELS.items():
-        if model["key_env"] is None:
-            # Local model — always available (user may need Ollama running)
-            available[key] = model
-        elif os.getenv(model["key_env"]):
-            available[key] = model
-    return available
+def build_model_list():
+    """Build complete model list with availability status."""
+    models = {}
+    idx = 1
 
+    # -- Check cloud models --
+    for key, model in CLOUD_MODELS.items():
+        has_key = bool(os.getenv(model["key_env"], "").strip())
+        models[str(idx)] = {
+            **model,
+            "available": has_key,
+            "status_reason": "Ready" if has_key else f"Need {model['key_env']}",
+        }
+        idx += 1
+
+    # -- Check Ollama --
+    ollama_running = check_ollama_running()
+    if ollama_running:
+        ollama_models = get_ollama_models()
+        if ollama_models:
+            # Add each pulled Ollama model
+            for om in ollama_models[:3]:  # Show up to 3 local models
+                display_name = om.split(":")[0]
+                models[str(idx)] = {
+                    "name": f"Ollama — {display_name} (Local, Free)",
+                    "model": f"ollama/{om}",
+                    "provider": "ollama",
+                    "key_env": None,
+                    "cost_info": "FREE",
+                    "description": "Runs on your computer, 100% private",
+                    "free": True,
+                    "available": True,
+                    "status_reason": "Ready (local)",
+                }
+                idx += 1
+        else:
+            models[str(idx)] = {
+                "name": "Ollama (No models pulled)",
+                "model": "ollama/llama3",
+                "provider": "ollama",
+                "key_env": None,
+                "cost_info": "FREE",
+                "description": "Run: ollama pull llama3",
+                "free": True,
+                "available": False,
+                "status_reason": "Run: ollama pull llama3",
+            }
+            idx += 1
+    else:
+        models[str(idx)] = {
+            "name": "Ollama (Not running)",
+            "model": "ollama/llama3",
+            "provider": "ollama",
+            "key_env": None,
+            "cost_info": "FREE",
+            "description": "Start with: ollama serve",
+            "free": True,
+            "available": False,
+            "status_reason": "Start: ollama serve",
+        }
+        idx += 1
+
+    return models
+
+
+# ─── Model Selection ──────────────────────────────────────────────
 
 def show_model_menu():
-    """Display model selection and return chosen model."""
-    available = detect_available_models()
-    all_models = MODELS
+    """Display model menu, handle selection, and return chosen model."""
+    models = build_model_list()
+    available = {k: v for k, v in models.items() if v["available"]}
 
     ui.section("Choose your AI Model:")
     print()
@@ -193,135 +278,290 @@ def show_model_menu():
     if HAS_RICH:
         table = Table(show_header=True, header_style="bold cyan", show_lines=True)
         table.add_column("#", style="bold", width=3)
-        table.add_column("Model", style="cyan", min_width=20)
-        table.add_column("Cost", min_width=25)
-        table.add_column("Status", width=12)
-        table.add_column("Description", min_width=30)
+        table.add_column("Model", min_width=25)
+        table.add_column("Cost", min_width=20)
+        table.add_column("Status", width=18)
 
-        for key, model in all_models.items():
-            is_available = key in available
-            status = "[green]Ready[/green]" if is_available else "[red]No API Key[/red]"
-            if model["key_env"] is None:
-                status = "[yellow]Local[/yellow]"
-            name_style = "bold" if is_available else "dim"
-            table.add_row(
-                key,
-                f"[{name_style}]{model['name']}[/{name_style}]",
-                model["cost"],
-                status,
-                model["description"],
-            )
+        for key, m in models.items():
+            if m["available"]:
+                status = "[green]Ready[/green]"
+                name_fmt = f"[bold]{m['name']}[/bold]"
+            else:
+                status = f"[red]{m['status_reason']}[/red]"
+                name_fmt = f"[dim]{m['name']}[/dim]"
+            table.add_row(key, name_fmt, m["cost_info"], status)
+
         ui.console.print(table)
     else:
-        for key, model in all_models.items():
-            is_available = key in available
-            status = "[Ready]" if is_available else "[No API Key]"
-            if model["key_env"] is None:
-                status = "[Local]"
-            print(f"  {key}. {model['name']:20s} {status:15s} {model['cost']}")
+        for key, m in models.items():
+            status = "Ready" if m["available"] else m["status_reason"]
+            marker = "*" if m["available"] else " "
+            print(f"  {marker} {key}. {m['name']:30s} {m['cost_info']:20s} [{status}]")
 
     print()
 
+    # -- No models at all --
     if not available:
-        ui.error("No AI models available!")
-        print()
-        print("  To use CELR, you need at least one of:")
-        print("    - OpenAI API key    → set OPENAI_API_KEY in .env")
-        print("    - Anthropic API key → set ANTHROPIC_API_KEY in .env")
-        print("    - Groq API key      → set GROQ_API_KEY in .env")
-        print("    - Ollama running    → install from https://ollama.com")
-        print()
-        print("  Copy .env.example to .env and add your key(s).")
-        return None
+        return handle_no_models()
 
+    # -- Selection loop --
     while True:
-        choice = input("  Enter number (or press Enter for auto-select): ").strip()
+        choice = input("  Enter number (or press Enter for best available): ").strip()
 
         if choice == "":
-            # Auto-select first available
-            first = list(available.keys())[0]
-            model = available[first]
-            ui.success(f"  Auto-selected: {model['name']}")
+            first_key = list(available.keys())[0]
+            model = available[first_key]
+            ui.success(f"\n  Auto-selected: {model['name']}")
             return model
 
         if choice in available:
-            model = available[choice]
-            ui.success(f"  Selected: {model['name']}")
-            return model
+            ui.success(f"\n  Selected: {models[choice]['name']}")
+            return models[choice]
 
-        if choice in all_models and choice not in available:
-            needed_key = all_models[choice]["key_env"]
-            ui.error(f"  {all_models[choice]['name']} requires {needed_key} in your .env file.")
-            continue
+        if choice in models and choice not in available:
+            m = models[choice]
+            reason = m["status_reason"]
 
-        ui.error(f"  Invalid choice '{choice}'. Please enter a number 1-{len(all_models)}.")
+            # Offer to enter API key right now
+            if m["key_env"]:
+                return offer_key_entry(m)
+            else:
+                # Ollama not ready
+                print()
+                if "pull" in reason.lower():
+                    ui.warning(f"  You need to pull a model first.")
+                    ui.info(f"  Open another terminal and run: ollama pull llama3")
+                    ui.info(f"  Then come back and try again.")
+                else:
+                    ui.warning(f"  Ollama is not running.")
+                    ui.info(f"  Open another terminal and run: ollama serve")
+                    ui.info(f"  Then restart this chat.")
+                print()
+                continue
+
+        ui.error(f"  Invalid choice. Enter 1-{len(models)}.")
 
 
-def get_budget():
-    """Ask user for budget."""
+def handle_no_models():
+    """Guide user when no models are available at all."""
+    print()
+    ui.error("  No AI models are available yet. Let's set one up!")
+    print()
+    ui.info("  You have two options:\n")
+
+    ui.section("  Option A: Use a FREE local model (Ollama)")
+    ui.info("    1. Download Ollama from https://ollama.com")
+    ui.info("    2. Open a terminal and run: ollama serve")
+    ui.info("    3. In another terminal run:  ollama pull llama3")
+    ui.info("    4. Come back and run: python celr_chat.py")
+    print()
+
+    ui.section("  Option B: Use a cloud AI (needs API key)")
+    ui.info("    1. Go to https://platform.openai.com/api-keys")
+    ui.info("       (or https://console.anthropic.com for Claude)")
+    ui.info("       (or https://console.groq.com for Groq — has free tier!)")
+    ui.info("    2. Create an API key")
+    ui.info("    3. You can either:")
+    ui.info("       a) Paste it when prompted here (I'll ask next)")
+    ui.info("       b) Add it to a .env file in this folder")
+
+    print()
+    answer = input("  Do you have an API key to enter now? (yes/no): ").strip().lower()
+
+    if answer in ("yes", "y"):
+        return enter_api_key_flow()
+
+    print()
+    ui.info("  No problem! Set up one of the options above and run again.")
+    ui.info("  Tip: Groq (https://console.groq.com) has a FREE tier!")
+    print()
+    return None
+
+
+def offer_key_entry(model_info):
+    """Let user paste their API key right in the terminal."""
+    key_name = model_info["key_env"]
+    print()
+    ui.info(f"  {model_info['name']} needs an API key ({key_name}).")
+    ui.info(f"  You can enter it now and I'll use it for this session.")
+    print()
+
+    key = input(f"  Paste your {key_name} (or press Enter to skip): ").strip()
+
+    if not key:
+        return None
+
+    # Set it for this session
+    os.environ[key_name] = key
+
+    # Offer to save to .env
+    save = input("  Save this key to .env for next time? (yes/no): ").strip().lower()
+    if save in ("yes", "y"):
+        save_key_to_env(key_name, key)
+        ui.success(f"  Saved to .env!")
+
+    ui.success(f"  Key set! Using {model_info['name']}")
+    model_info["available"] = True
+    return model_info
+
+
+def enter_api_key_flow():
+    """Walk user through entering any API key."""
+    print()
+    ui.section("  Which provider?")
+    print("    1. OpenAI (GPT-4o)")
+    print("    2. Anthropic (Claude)")
+    print("    3. Groq (Llama 3 — has FREE tier!)")
+    print()
+
+    providers = {
+        "1": ("OPENAI_API_KEY", "1"),
+        "2": ("ANTHROPIC_API_KEY", "3"),
+        "3": ("GROQ_API_KEY", "4"),
+    }
+
+    choice = input("  Enter 1, 2, or 3: ").strip()
+    if choice not in providers:
+        ui.error("  Invalid choice.")
+        return None
+
+    key_name, model_key = providers[choice]
+    key = input(f"\n  Paste your {key_name}: ").strip()
+
+    if not key:
+        return None
+
+    os.environ[key_name] = key
+
+    save = input("  Save to .env for next time? (yes/no): ").strip().lower()
+    if save in ("yes", "y"):
+        save_key_to_env(key_name, key)
+        ui.success("  Saved!")
+
+    # Return the corresponding cloud model
+    model = CLOUD_MODELS[model_key].copy()
+    model["available"] = True
+    model["status_reason"] = "Ready"
+    return model
+
+
+def save_key_to_env(key_name, key_value):
+    """Append or update a key in the .env file."""
+    env_path = os.path.join(os.path.dirname(__file__), ".env")
+
+    # Read existing content
+    lines = []
+    if os.path.exists(env_path):
+        with open(env_path, "r") as f:
+            lines = f.readlines()
+
+    # Check if key already exists
+    found = False
+    for i, line in enumerate(lines):
+        if line.strip().startswith(f"{key_name}="):
+            lines[i] = f"{key_name}={key_value}\n"
+            found = True
+            break
+
+    if not found:
+        lines.append(f"{key_name}={key_value}\n")
+
+    with open(env_path, "w") as f:
+        f.writelines(lines)
+
+
+# ─── Budget ───────────────────────────────────────────────────────
+
+def get_budget(model_info):
+    """Ask for budget, or skip if using free model."""
+    if model_info.get("free"):
+        ui.info("  Using free local model — no budget needed!")
+        return 0.0  # Unlimited for local
+
     ui.section("Set your budget:")
     print()
-    print("  How much are you willing to spend this session?")
-    print("  (Typical conversation costs $0.01 - $0.10)")
+    ui.info("  How much are you willing to spend this session?")
+    ui.info("  Typical conversation: $0.01 - $0.10")
     print()
 
     while True:
         raw = input("  Budget in USD (default $0.50): $").strip()
         if raw == "":
-            ui.info("  Using default budget: $0.50")
+            ui.info("  Using default: $0.50")
             return 0.50
         try:
             budget = float(raw)
             if budget <= 0:
-                ui.error("  Budget must be positive.")
+                ui.error("  Must be positive.")
                 continue
             if budget > 10:
-                ui.warning(f"  That's ${budget:.2f} — are you sure? (yes/no): ")
-                confirm = input("  ").strip().lower()
+                confirm = input(f"  That's ${budget:.2f} — sure? (yes/no): ").strip().lower()
                 if confirm not in ("yes", "y"):
                     continue
             return budget
         except ValueError:
-            ui.error("  Please enter a number (e.g., 0.50)")
+            ui.error("  Enter a number (e.g., 0.50)")
 
 
 # ─── Chat Engine ──────────────────────────────────────────────────
 
 def create_chat_engine(model_info, budget):
-    """Build the CELR pipeline for chat."""
-    from celr.core.config import CELRConfig
+    """Build the LLM provider for chat."""
     from celr.core.types import TaskContext, ModelConfig
     from celr.core.cost_tracker import CostTracker
-    from celr.core.llm import LiteLLMProvider, LLMUsage
+    from celr.core.llm import LiteLLMProvider
 
-    # Create a model config for the chosen model
     model_config = ModelConfig(
         name=model_info["model"],
         provider=model_info["provider"],
-        cost_per_million_input_tokens=0.15,  # Default, actual cost from LiteLLM
+        cost_per_million_input_tokens=0.15,
         cost_per_million_output_tokens=0.60,
     )
 
     provider = LiteLLMProvider(model_config)
-    context = TaskContext(original_request="interactive_chat", budget_limit_usd=budget)
+
+    # For free models, use a huge budget (effectively unlimited)
+    effective_budget = budget if budget > 0 else 999999.0
+    context = TaskContext(original_request="interactive_chat", budget_limit_usd=effective_budget)
     tracker = CostTracker(context)
 
     return provider, context, tracker
 
 
-def chat_loop(provider, context, tracker, model_name):
+def test_connection(provider, model_name):
+    """Send a tiny test message to verify the model works."""
+    try:
+        if HAS_RICH:
+            with ui.console.status("[bold cyan]  Testing connection...", spinner="dots"):
+                response, usage = provider.generate(
+                    prompt="Reply with just the word 'hello'.",
+                    system_prompt="Respond with only one word.",
+                )
+        else:
+            print("  Testing connection...")
+            response, usage = provider.generate(
+                prompt="Reply with just the word 'hello'.",
+                system_prompt="Respond with only one word.",
+            )
+        return True, None
+    except Exception as e:
+        return False, str(e)
+
+
+# ─── Chat Loop ────────────────────────────────────────────────────
+
+def chat_loop(provider, context, tracker, model_info):
     """Main conversation loop."""
     conversation_history = []
     message_count = 0
+    model_name = model_info["name"]
+    is_free = model_info.get("free", False)
 
     print()
-    ui.success("  Chat is ready! Start typing your questions.")
+    ui.success("  Chat is ready! Start typing.")
     print()
-    ui.info("  Commands:")
-    ui.info("    /help     — Show available commands")
-    ui.info("    /cost     — Show current spending")
-    ui.info("    /clear    — Clear conversation history")
-    ui.info("    /exit     — End the session")
+    ui.info("  Type your message and press Enter.")
+    ui.info("  Type /help for commands, /exit to quit.")
     print()
 
     system_prompt = (
@@ -332,7 +572,6 @@ def chat_loop(provider, context, tracker, model_name):
     )
 
     while True:
-        # Show prompt
         try:
             user_input = input("  You: ").strip()
         except (EOFError, KeyboardInterrupt):
@@ -342,122 +581,125 @@ def chat_loop(provider, context, tracker, model_name):
         if not user_input:
             continue
 
-        # Handle commands
+        # -- Commands --
         if user_input.startswith("/"):
             cmd = user_input.lower().split()[0]
 
-            if cmd in ("/exit", "/quit", "/bye"):
+            if cmd in ("/exit", "/quit", "/bye", "/q"):
                 break
-
             elif cmd == "/help":
                 print()
-                ui.info("  Available commands:")
-                ui.info("    /help     — This help message")
-                ui.info("    /cost     — Show spending summary")
-                ui.info("    /clear    — Start fresh conversation")
-                ui.info("    /model    — Show current model info")
-                ui.info("    /exit     — End session")
+                ui.info("  Commands:")
+                ui.info("    /help   — Show this help")
+                ui.info("    /cost   — Show spending")
+                ui.info("    /clear  — New conversation")
+                ui.info("    /model  — Current model info")
+                ui.info("    /exit   — End session")
                 print()
                 continue
-
             elif cmd == "/cost":
                 print()
-                ui.cost_bar(context.current_spread_usd, context.budget_limit_usd)
-                ui.info(f"  Messages sent: {message_count}")
+                if is_free:
+                    ui.info(f"  Model: {model_name} (FREE)")
+                    ui.info(f"  Messages: {message_count}")
+                else:
+                    ui.cost_bar(context.current_spread_usd, context.budget_limit_usd)
+                    ui.info(f"  Messages: {message_count}")
                 print()
                 continue
-
             elif cmd == "/clear":
                 conversation_history.clear()
                 message_count = 0
-                ui.success("  Conversation cleared.")
+                ui.success("  Conversation cleared!")
                 print()
                 continue
-
             elif cmd == "/model":
                 ui.info(f"  Model: {model_name}")
-                ui.info(f"  Messages: {message_count}")
+                ui.info(f"  Provider: {model_info['provider']}")
+                ui.info(f"  Cost: {model_info['cost_info']}")
                 print()
                 continue
-
             else:
-                ui.warning(f"  Unknown command: {cmd}. Type /help for options.")
+                ui.warning(f"  Unknown: {cmd}. Type /help")
                 continue
 
-        # Check budget
-        remaining = context.budget_limit_usd - context.current_spread_usd
-        if remaining <= 0:
-            print()
-            ui.error("  Budget exhausted! Session ended.")
-            ui.info(f"  Total spent: ${context.current_spread_usd:.4f}")
-            break
+        # -- Budget check (cloud only) --
+        if not is_free:
+            remaining = context.budget_limit_usd - context.current_spread_usd
+            if remaining <= 0:
+                print()
+                ui.error("  Budget used up! Session ended.")
+                ui.info(f"  Spent: ${context.current_spread_usd:.4f}")
+                break
 
-        # Add user message to history
+        # -- Build prompt from history --
         conversation_history.append({"role": "user", "content": user_input})
-
-        # Build the full prompt with conversation context
         full_prompt = ""
-        for msg in conversation_history[-10:]:  # Keep last 10 messages for context
+        for msg in conversation_history[-10:]:
             role = "User" if msg["role"] == "user" else "Assistant"
             full_prompt += f"{role}: {msg['content']}\n\n"
 
-        # Call LLM
+        # -- Call LLM --
         try:
             start = time.time()
-
             if HAS_RICH:
                 with ui.console.status("[bold cyan]  Thinking...", spinner="dots"):
-                    response, usage = provider.generate(
-                        prompt=full_prompt,
-                        system_prompt=system_prompt,
-                    )
+                    response, usage = provider.generate(prompt=full_prompt, system_prompt=system_prompt)
             else:
                 print("  Thinking...")
-                response, usage = provider.generate(
-                    prompt=full_prompt,
-                    system_prompt=system_prompt,
-                )
+                response, usage = provider.generate(prompt=full_prompt, system_prompt=system_prompt)
 
             elapsed = time.time() - start
-
-            # Track cost
             cost = provider.calculate_cost(usage)
-            tracker.add_cost(cost)
+            if not is_free:
+                tracker.add_cost(cost)
             message_count += 1
 
-            # Add AI response to history
             conversation_history.append({"role": "assistant", "content": response})
-
-            # Display response
-            print()
-            if HAS_RICH:
-                ui.console.print(Panel(
-                    Markdown(response),
-                    title=f"[cyan]{model_name}[/cyan]",
-                    subtitle=f"[dim]${cost:.4f} | {elapsed:.1f}s | {usage.total_tokens} tokens[/dim]",
-                    border_style="blue",
-                    padding=(0, 1),
-                ))
-            else:
-                print(f"  AI: {response}")
-                print(f"  [{cost:.4f} USD | {elapsed:.1f}s | {usage.total_tokens} tokens]")
-            print()
+            display_cost = 0.0 if is_free else cost
+            ui.ai_response(response, model_name, display_cost, elapsed, usage.total_tokens)
 
         except Exception as e:
-            error_msg = str(e)
+            err = str(e).lower()
             print()
-
-            if "api_key" in error_msg.lower() or "auth" in error_msg.lower():
-                ui.error("  Authentication failed. Check your API key in .env")
-            elif "rate" in error_msg.lower() or "limit" in error_msg.lower():
-                ui.warning("  Rate limited. Wait a moment and try again.")
-            elif "connection" in error_msg.lower() or "timeout" in error_msg.lower():
-                if "ollama" in model_name.lower():
-                    ui.error("  Cannot connect to Ollama. Is it running? (ollama serve)")
+            if "api_key" in err or "auth" in err or "401" in err:
+                ui.error("  API key is invalid or expired.")
+                ui.info(f"  Check your {model_info.get('key_env', 'API key')}.")
+                retry = input("  Enter a new key? (yes/no): ").strip().lower()
+                if retry in ("yes", "y"):
+                    new_key = input(f"  Paste {model_info.get('key_env', 'key')}: ").strip()
+                    if new_key and model_info.get("key_env"):
+                        os.environ[model_info["key_env"]] = new_key
+                        # Rebuild provider
+                        from celr.core.types import ModelConfig
+                        from celr.core.llm import LiteLLMProvider
+                        mc = ModelConfig(
+                            name=model_info["model"], provider=model_info["provider"],
+                            cost_per_million_input_tokens=0.15, cost_per_million_output_tokens=0.60,
+                        )
+                        provider = LiteLLMProvider(mc)
+                        ui.success("  Key updated! Try your message again.")
+                    # Remove the failed user message from history
+                    conversation_history.pop()
+            elif "rate" in err or "limit" in err or "429" in err:
+                ui.warning("  Rate limited. Wait a few seconds and try again.")
+                conversation_history.pop()
+            elif "connection" in err or "timeout" in err or "refused" in err:
+                if "ollama" in model_info["model"].lower():
+                    ui.error("  Can't reach Ollama. Is it still running?")
+                    ui.info("  Check: ollama serve")
                 else:
                     ui.error("  Connection failed. Check your internet.")
+                conversation_history.pop()
+            elif "model" in err and ("not found" in err or "does not exist" in err):
+                ui.error(f"  Model not found: {model_info['model']}")
+                if "ollama" in model_info["model"].lower():
+                    model_short = model_info["model"].replace("ollama/", "")
+                    ui.info(f"  Pull it first: ollama pull {model_short}")
+                conversation_history.pop()
             else:
-                ui.error(f"  Error: {error_msg}")
+                ui.error(f"  Error: {e}")
+                conversation_history.pop()
             print()
 
     return message_count
@@ -465,30 +707,37 @@ def chat_loop(provider, context, tracker, model_name):
 
 # ─── Session Summary ──────────────────────────────────────────────
 
-def show_summary(context, message_count, model_name):
+def show_summary(context, message_count, model_info):
     """End-of-session summary."""
+    is_free = model_info.get("free", False)
     print()
+
     if HAS_RICH:
         table = Table(title="Session Summary", show_lines=True, border_style="cyan")
         table.add_column("Metric", style="bold")
         table.add_column("Value", style="cyan")
-        table.add_row("Model", model_name)
+        table.add_row("Model", model_info["name"])
         table.add_row("Messages", str(message_count))
-        table.add_row("Total Cost", f"${context.current_spread_usd:.4f}")
-        table.add_row("Budget Remaining", f"${context.budget_limit_usd - context.current_spread_usd:.4f}")
-        if message_count > 0:
-            avg = context.current_spread_usd / message_count
-            table.add_row("Avg Cost/Message", f"${avg:.4f}")
+        if is_free:
+            table.add_row("Cost", "FREE (local model)")
+        else:
+            table.add_row("Total Cost", f"${context.current_spread_usd:.4f}")
+            table.add_row("Budget Left", f"${context.budget_limit_usd - context.current_spread_usd:.4f}")
+            if message_count > 0:
+                avg = context.current_spread_usd / message_count
+                table.add_row("Avg/Message", f"${avg:.4f}")
         ui.console.print(table)
     else:
-        print("  ── Session Summary ──")
-        print(f"  Model:            {model_name}")
-        print(f"  Messages:         {message_count}")
-        print(f"  Total Cost:       ${context.current_spread_usd:.4f}")
-        print(f"  Budget Remaining: ${context.budget_limit_usd - context.current_spread_usd:.4f}")
+        print("  -- Session Summary --")
+        print(f"  Model:    {model_info['name']}")
+        print(f"  Messages: {message_count}")
+        if is_free:
+            print("  Cost:     FREE")
+        else:
+            print(f"  Cost:     ${context.current_spread_usd:.4f}")
 
     print()
-    ui.info("  Thanks for using CELR! Goodbye.")
+    ui.info("  Thanks for using CELR!")
     print()
 
 
@@ -501,29 +750,55 @@ def main():
     # 1. Pick model
     model_info = show_model_menu()
     if model_info is None:
-        sys.exit(1)
+        sys.exit(0)
 
-    # 2. Set budget
-    budget = get_budget()
+    # 2. Set budget (skipped for free models)
+    budget = get_budget(model_info)
 
     # 3. Build engine
     print()
-    ui.info(f"  Setting up {model_info['name']}...")
+    ui.info(f"  Starting {model_info['name']}...")
     try:
         provider, context, tracker = create_chat_engine(model_info, budget)
     except Exception as e:
-        ui.error(f"  Failed to initialize: {e}")
+        ui.error(f"  Setup failed: {e}")
         sys.exit(1)
+
+    # 4. Test connection
+    ok, error = test_connection(provider, model_info["name"])
+    if not ok:
+        err = error.lower() if error else ""
+        if "api_key" in err or "auth" in err or "401" in err:
+            ui.error(f"  API key invalid for {model_info['name']}.")
+            if model_info.get("key_env"):
+                result = offer_key_entry(model_info)
+                if result:
+                    provider, context, tracker = create_chat_engine(result, budget)
+                    model_info = result
+                else:
+                    sys.exit(1)
+            else:
+                sys.exit(1)
+        elif "connection" in err or "refused" in err:
+            if "ollama" in model_info["model"].lower():
+                ui.error("  Ollama is not responding. Make sure 'ollama serve' is running.")
+            else:
+                ui.error(f"  Can't connect: {error}")
+            sys.exit(1)
+        else:
+            ui.warning(f"  Connection test failed: {error}")
+            ui.info("  Continuing anyway — the model may still work for longer prompts.")
 
     ui.clear()
     ui.banner()
-    ui.info(f"  Model: {model_info['name']}  |  Budget: ${budget:.2f}")
+    cost_str = f"Budget: ${budget:.2f}" if budget > 0 else "FREE"
+    ui.info(f"  Model: {model_info['name']}  |  {cost_str}")
 
-    # 4. Chat loop
-    message_count = chat_loop(provider, context, tracker, model_info["name"])
+    # 5. Chat!
+    message_count = chat_loop(provider, context, tracker, model_info)
 
-    # 5. Summary
-    show_summary(context, message_count, model_info["name"])
+    # 6. Summary
+    show_summary(context, message_count, model_info)
 
 
 if __name__ == "__main__":
