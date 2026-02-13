@@ -85,10 +85,14 @@ class CELRConfig(BaseSettings):
             return "ollama"
         elif model_name.startswith("claude") or model_name.startswith("anthropic/"):
             return "anthropic"
-        elif model_name.startswith("gpt") or model_name.startswith("o1"):
+        elif model_name.startswith("gpt") or model_name.startswith("o1") or model_name.startswith("o3"):
             return "openai"
         elif model_name.startswith("gemini/"):
             return "google"
+        elif model_name.startswith("groq/"):
+            return "groq"
+        elif model_name.startswith("deepseek/"):
+            return "deepseek"
         else:
             return "openai"  # Default fallback
 
