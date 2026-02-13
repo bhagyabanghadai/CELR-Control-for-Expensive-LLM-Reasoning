@@ -40,7 +40,19 @@ run_demo.bat
 ```
 This runs a simulated task ("Write Hello World"), showing planning, execution, verification, and cost tracking.
 
-### 4. Running with Ollama (Local)
+### 4. Interactive Chat (Recommended)
+Talk to AI in your terminal — no coding needed:
+```bash
+python celr_chat.py
+```
+You'll see a menu to:
+1. **Pick your AI** (GPT-4o, Claude, Groq, or local Ollama)
+2. **Set a budget** (e.g., $0.50)
+3. **Start chatting** — just type naturally
+
+Commands: `/help`, `/cost`, `/clear`, `/exit`
+
+### 5. Running with Ollama (Local)
 To run fully local using Llama 3 (or any other model):
 1.  Ensure Ollama is running (`ollama serve`).
 2.  Pull the model (`ollama pull llama3`).
@@ -50,7 +62,7 @@ To run fully local using Llama 3 (or any other model):
     ```
     This forces CELR to use your local model for everything.
 
-### 5. Running with Real APIs
+### 6. Running with Real APIs
 To use OpenAI, Anthropic, or Groq:
 1.  Copy `.env.example` to `.env`.
 2.  Add your keys (`OPENAI_API_KEY=sk-...`).
