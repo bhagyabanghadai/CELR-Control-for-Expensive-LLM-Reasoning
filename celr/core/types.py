@@ -1,6 +1,6 @@
 from enum import Enum
 from typing import List, Optional, Dict, Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 import uuid
 from datetime import datetime
 
@@ -41,6 +41,20 @@ class Step(BaseModel):
     retry_count: int = 0
     max_retries: int = 3
     escalation_tier: Optional[str] = None  # Which tier handled this step
+
+    @field_validator("step_type", mode="before")
+    @classmethod
+    def sanitize_step_type(cls, v):
+        """Map any invalid step type to REASONING (resilient to small LLMs)."""
+        if isinstance(v, StepType):
+            return v
+        if isinstance(v, str):
+            v_upper = v.upper().strip()
+            try:
+                return StepType(v_upper)
+            except ValueError:
+                return StepType.REASONING
+        return StepType.REASONING
 
 class Plan(BaseModel):
     items: List[Step]
