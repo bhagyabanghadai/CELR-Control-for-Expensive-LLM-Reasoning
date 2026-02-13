@@ -1,0 +1,40 @@
+{
+  "task_id": "demo-run-001",
+  "original_request": "Write a Python script that prints Hello World",
+  "final_status": "SUCCESS",
+  "total_cost": 0.00017999999999999998,
+  "budget_limit_usd": 0.5,
+  "plan": [
+    {
+      "id": "step-1",
+      "description": "Generate Python code to print Hello World",
+      "status": "COMPLETED",
+      "difficulty": 0.1,
+      "agent": null,
+      "output": "```python\nprint('Hello, World from CELR Demo!')\n```",
+      "retry_count": 0
+    },
+    {
+      "id": "step-2",
+      "description": "Verify the code is correct",
+      "status": "COMPLETED",
+      "difficulty": 0.2,
+      "agent": null,
+      "output": "```python\nprint('Hello, World from CELR Demo!')\n```",
+      "retry_count": 0
+    }
+  ],
+  "execution_log": [
+    "[2026-02-12T22:38:14.585893] running_decomposition",
+    "[2026-02-12T22:38:14.887055] Plan created with 2 steps.",
+    "[2026-02-12T22:38:14.887055] Plan created successfully",
+    "[2026-02-12T22:38:14.887055] Starting execution loop...",
+    "[2026-02-12T22:38:14.887580] Executing step: Generate Python code to print Hello World (step-1)",
+    "[2026-02-12T22:38:15.187961] LLM call: None, tokens=0, cost=$0.000090",
+    "[2026-02-12T22:38:15.488529] Step step-1 completed (attempt 1). output_len=51",
+    "[2026-02-12T22:38:15.589235] Executing step: Verify the code is correct (step-2)",
+    "[2026-02-12T22:38:15.890147] LLM call: None, tokens=0, cost=$0.000090",
+    "[2026-02-12T22:38:16.190857] Step step-2 completed (attempt 1). output_len=51",
+    "[2026-02-12T22:38:16.291314] All steps completed successfully."
+  ]
+}
