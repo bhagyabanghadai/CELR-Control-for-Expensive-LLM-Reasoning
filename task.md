@@ -63,3 +63,21 @@
 
 ### 7F: Sign-Off
 - [x] Run all tests, commit, push to GitHub <!-- id: 52 -->
+
+## Phase 8: Live Testing & Scripts 🚀
+- [x] Create `demo.py` (Mock LLM) and fix bugs
+- [x] Create `run_demo.bat` (Dry Run)
+- [x] Create `run_ollama.bat` (Local LLM Execution)
+- [x] Create `train_ollama.bat` (Self-Improvement Pipeline)
+- [x] Verify end-to-end execution with local Llama 3
+- [x] Update documentation (README, Walkthrough)
+
+## Phase 8: Adaptive Cortex (Meta-Learning Control) 🧠
+- [x] Create `celr/cortex/` package
+- [x] Implement `StateExtractor` (logs -> RL state vector)
+- [x] Implement `MetaPolicy` (Rule-based baseline + RL support)
+- [x] Implement `OfflineTrainer` (Compute rewards from logs)
+- [x] Implement `PromotionGate` (Benchmark suite validation)
+- [x] Integrate Cortex into `Executor` (Control loop)
+- [x] Verify Policy Promotion (Train on logs -> Pass Gate -> Run)
+- [x] Add "Adaptive Cortex" section to README
