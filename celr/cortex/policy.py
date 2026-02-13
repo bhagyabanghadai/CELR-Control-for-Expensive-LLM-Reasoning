@@ -53,7 +53,7 @@ class MetaPolicy:
         # 3. Retry Logic
         if retry_ratio > 0.6:
             # Many retries -> Try compressed prompt or Abort
-            if CortexAction.RETy_COMPRESSED in available_actions: # Typo in enum usage? No, it's RETRY_COMPRESSED
+            if CortexAction.RETRY_COMPRESSED in available_actions:
                 return CortexAction.RETRY_COMPRESSED
             if retry_ratio > 0.9:
                 return CortexAction.ABORT
