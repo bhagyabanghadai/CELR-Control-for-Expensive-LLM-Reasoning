@@ -140,7 +140,7 @@ ui = ChatUI()
 def check_ollama_running():
     """Check if Ollama server is running on localhost."""
     try:
-        req = urllib.request.Request("http://localhost:11434/api/tags", method="GET")
+        req = urllib.request.Request("http://127.0.0.1:11434/api/tags", method="GET")
         with urllib.request.urlopen(req, timeout=3) as resp:
             return resp.status == 200
     except Exception:
@@ -150,7 +150,7 @@ def check_ollama_running():
 def get_ollama_models():
     """Get list of models pulled in Ollama."""
     try:
-        req = urllib.request.Request("http://localhost:11434/api/tags", method="GET")
+        req = urllib.request.Request("http://127.0.0.1:11434/api/tags", method="GET")
         with urllib.request.urlopen(req, timeout=3) as resp:
             data = json.loads(resp.read().decode())
             return [m["name"] for m in data.get("models", [])]
@@ -221,7 +221,7 @@ def build_model_list():
         ollama_models = get_ollama_models()
         if ollama_models:
             # Add each pulled Ollama model
-            for om in ollama_models[:3]:  # Show up to 3 local models
+            for om in ollama_models:  # Show ALL local models (dynamic)
                 display_name = om.split(":")[0]
                 models[str(idx)] = {
                     "name": f"Ollama — {display_name} (Local, Free)",
@@ -238,20 +238,20 @@ def build_model_list():
         else:
             models[str(idx)] = {
                 "name": "Ollama (No models pulled)",
-                "model": "ollama/llama3",
+                "model": "ollama/llama3.2",
                 "provider": "ollama",
                 "key_env": None,
                 "cost_info": "FREE",
-                "description": "Run: ollama pull llama3",
+                "description": "Run: ollama pull llama3.2",
                 "free": True,
                 "available": False,
-                "status_reason": "Run: ollama pull llama3",
+                "status_reason": "Run: ollama pull llama3.2",
             }
             idx += 1
     else:
         models[str(idx)] = {
             "name": "Ollama (Not running)",
-            "model": "ollama/llama3",
+            "model": "ollama/llama3.2",
             "provider": "ollama",
             "key_env": None,
             "cost_info": "FREE",
@@ -330,7 +330,7 @@ def show_model_menu():
                 print()
                 if "pull" in reason.lower():
                     ui.warning(f"  You need to pull a model first.")
-                    ui.info(f"  Open another terminal and run: ollama pull llama3")
+                    ui.info(f"  Open another terminal and run: ollama pull llama3.2")
                     ui.info(f"  Then come back and try again.")
                 else:
                     ui.warning(f"  Ollama is not running.")
@@ -352,7 +352,7 @@ def handle_no_models():
     ui.section("  Option A: Use a FREE local model (Ollama)")
     ui.info("    1. Download Ollama from https://ollama.com")
     ui.info("    2. Open a terminal and run: ollama serve")
-    ui.info("    3. In another terminal run:  ollama pull llama3")
+    ui.info("    3. In another terminal run:  ollama pull llama3.2")
     ui.info("    4. Come back and run: python celr_chat.py")
     print()
 
@@ -507,6 +507,38 @@ def get_budget(model_info):
 
 def create_chat_engine(model_info, budget):
     """Build the LLM provider for chat."""
+    # ─── Self-Correction: Auto-Install Dependencies ───────────────────
+    import subprocess
+    import sys
+
+    def ensure_dependencies():
+        """Check and install missing dependencies automatically."""
+        required = {
+            "wikipedia": "wikipedia",
+            "duckduckgo_search": "duckduckgo-search",
+            "bs4": "beautifulsoup4",
+            "requests": "requests"
+        }
+        missing = []
+        for module, package in required.items():
+            try:
+                __import__(module)
+            except ImportError:
+                missing.append(package)
+        
+        if missing:
+            print(f"🔧 Installing missing tools for reasoning: {', '.join(missing)}...")
+            try:
+                subprocess.check_call([sys.executable, "-m", "pip", "install", *missing], 
+                                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                print("✅ Tools installed successfully!\n")
+            except Exception as e:
+                print(f"⚠️ Failed to auto-install tools: {e}")
+                print(f"   Please run: pip install {' '.join(missing)}\n")
+
+    ensure_dependencies()
+
+    # Now import the rest
     # Core Imports
     from celr.core.types import TaskContext, ModelConfig
     from celr.core.cost_tracker import CostTracker
@@ -696,12 +728,12 @@ def chat_loop(provider, router, executor, planner, context, tracker, model_info)
                 ui.info(f"  Spent: ${context.current_spread_usd:.4f}")
                 break
 
-        # -- Build prompt from history --
+        # -- Build proper messages from history --
         conversation_history.append({"role": "user", "content": user_input})
-        full_prompt = ""
-        for msg in conversation_history[-10:]:
-            role = "User" if msg["role"] == "user" else "Assistant"
-            full_prompt += f"{role}: {msg['content']}\n\n"
+        
+        # Build messages array for the LLM (last 10 turns)
+        chat_messages = [{"role": "system", "content": system_prompt}]
+        chat_messages.extend(conversation_history[-10:])
 
         # -- Hybrid Routing (The "Smart vs Fast" Logic) --
         try:
@@ -718,41 +750,64 @@ def chat_loop(provider, router, executor, planner, context, tracker, model_info)
             cost = 0.0
 
             if route_type == "DIRECT":
-                # -- Fast Path (System 1) --
+                # -- Fast Path (System 1) — uses proper messages array --
                 if HAS_RICH:
                     with ui.console.status("[bold green]  Fast Mode (Direct)...[/bold green]", spinner="dots"):
-                        response, usage = provider.generate(prompt=full_prompt, system_prompt=system_prompt)
+                        response, usage = provider.generate_chat(messages=chat_messages)
                         usage_tokens = usage.total_tokens
                         if not is_free:
                             cost = provider.calculate_cost(usage)
+                else:
+                    response, usage = provider.generate_chat(messages=chat_messages)
+                    usage_tokens = usage.total_tokens
+                    if not is_free:
+                        cost = provider.calculate_cost(usage)
             else:
                 # -- Smart Path (System 2) --
                 ui.info(f"  🧠 Complex task detected: {reason}")
                 ui.info("  Activating Reasoning Engine...")
                 
-                # Update context with current request
-                context.original_request = user_input
+                # Create FRESH context for each reasoning query (prevents answer contamination)
+                from celr.core.types import TaskContext
+                reasoning_context = TaskContext(
+                    original_request=user_input,
+                    budget_limit_usd=context.budget_limit_usd,
+                )
                 
                 if HAS_RICH:
                     with ui.console.status("[bold magenta]  Reasoning & Planning...[/bold magenta]", spinner="earth"):
-                        # Create Plan
-                        plan = planner.create_initial_plan(context)
+                        # Create Plan with fresh context
+                        plan = planner.create_initial_plan(reasoning_context)
                         # Execute Plan
                         status = executor.run(plan)
                 else:
                     print("  Reasoning & Planning...")
-                    plan = planner.create_initial_plan(context)
+                    plan = planner.create_initial_plan(reasoning_context)
                     status = executor.run(plan)
                 
                 # Synthesize final answer from steps
                 executed_steps = [s for s in plan.items if s.output]
                 if executed_steps:
-                    final_step = executed_steps[-1]
-                    response = f"**Reasoning Result:**\n\n{final_step.output}"
+                    # Collect all step outputs
+                    step_outputs = "\n".join([s.output for s in executed_steps])
                     
-                    # Estimate usage from context (simplified)
-                    usage_tokens = 1000 # Placeholder for aggregated usage
-                    cost = context.current_spread_usd # Valid for tracking
+                    # Use LLM to synthesize a clean final answer
+                    synth_prompt = (
+                        f"The user asked: {user_input}\n\n"
+                        f"Here are the reasoning results:\n{step_outputs}\n\n"
+                        f"Please provide a clear, well-structured answer to the user's original question. "
+                        f"Focus only on answering their question, not on the reasoning process."
+                    )
+                    try:
+                        response, usage = provider.generate(prompt=synth_prompt, system_prompt=system_prompt)
+                        usage_tokens = usage.total_tokens
+                        if not is_free:
+                            cost = provider.calculate_cost(usage)
+                    except Exception:
+                        # Fallback: use raw step output
+                        response = f"**Reasoning Result:**\n\n{step_outputs}"
+                        usage_tokens = 1000
+                        cost = reasoning_context.current_spread_usd
                 else:
                     response = "I tried to reason about that but couldn't verify a solution."
 
