@@ -30,9 +30,15 @@ import builtins as _builtins
 _BLOCKED = {"open", "exec", "eval", "compile", "globals", "locals", 
             "breakpoint", "exit", "quit", "input"}
 
+
+def mock_input(prompt: str = ""):
+    """Mock input function for sandbox execution."""
+    raise RuntimeError("Input is not supported in sandbox mode. Please use provided values.")
+
 SAFE_BUILTINS = {k: v for k, v in vars(_builtins).items() 
                  if not k.startswith("_") or k in ("__import__", "__build_class__", "__name__")
                  if k not in _BLOCKED}
+SAFE_BUILTINS["input"] = mock_input # Explicitly allow input as a mock
 
 MAX_OUTPUT_BYTES = 10_240  # 10KB max output
 EXEC_TIMEOUT_SECONDS = 10
