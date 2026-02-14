@@ -1,0 +1,37 @@
+{
+  "model": "ollama/llama3.2",
+  "budget": 0.3,
+  "timestamp": "2026-02-13 20:51:41",
+  "celr_results": [
+    {
+      "task_id": "gsm8k_1",
+      "method": "celr",
+      "prompt": "A store sells notebooks for $3 each and pens for $1.50 each. Maria buys 4 notebooks and 6 pens. She pays with a $50 bill. How much change does she receive? Show your work step by step.",
+      "output": "Total cost: $97.20\n\n[Captured Code]\ndef calculate_total_cost(base_price, discount=0, tax_rate=0):\n    \"\"\"\n    Calculate total cost of items.\n\n    Args:\n        base_price (float): The original price of the item(s).\n        discount (float, optional): Discount percentage. Defaults to 0.\n        tax_rate (float, optional): Tax rate percentage. Defaults to 0.\n\n    Returns:\n        float: Total cost after applying discounts and taxes.\n    \"\"\"\n    # Calculate discount\n    discount_amount = base_price * (discount / 100)\n    \n    # Apply discount\n    price_after_discount = base_price - discount_amount\n    \n    # Calculate tax amount\n    tax_amount = price_after_discount * (tax_rate / 100)\n    \n    # Add tax to discounted price\n    total_cost = price_after_discount + tax_amount\n    \n    return total_cost\n\n\n# Test the function\nbase_price = 100.0\ndiscount_percentage = 10.0\ntax_rate = 8.0\n\ntotal_cost = calculate_total_cost(base_price, discount_percentage, tax_rate)\nprint(f\"Total cost: ${total_cost:.2f}\")\nThe change is $100.\n\n[Captured Code]\ndef calculate_change(cost, amount_paid):\n    change = amount_paid - cost\n    return round(change, 2)\n\ncost = 100\namount_paid = 200\n\nresult = calculate_change(cost, amount_paid)\nprint(f\"The change is ${result}.\")",
+      "success": true,
+      "accuracy": false,
+      "cost_usd": 0.0,
+      "latency_s": 9.953519344329834,
+      "escalation_count": 0,
+      "steps_executed": 2,
+      "retries": 0,
+      "error": ""
+    }
+  ],
+  "direct_results": [
+    {
+      "task_id": "gsm8k_1",
+      "method": "direct",
+      "prompt": "A store sells notebooks for $3 each and pens for $1.50 each. Maria buys 4 notebooks and 6 pens. She pays with a $50 bill. How much change does she receive? Show your work step by step.",
+      "output": "To find the total amount of change Maria receives, we need to calculate the total cost of the items she bought and subtract that from the $50 bill.\n\nStep 1: Calculate the cost of the notebooks\nNumber of notebooks = 4\nCost per notebook = $3\nTotal cost of notebooks = Number of notebooks x Cost per notebook\n= 4 x $3\n= $12\n\nStep 2: Calculate the cost of the pens\nNumber of pens = 6\nCost per pen = $1.50\nTotal cost of pens = Number of pens x Cost per pen\n= 6 x $1.50\n= $9\n\nStep 3: Find the total cost of all items bought\nTotal cost = Total cost of notebooks + Total cost of pens\n= $12 + $9\n= $21\n\nStep 4: Calculate the change Maria receives\nChange = Amount paid - Total cost\n= $50 (bill) - $21 (total cost)\n= $29\n\nTherefore, Maria receives $29 in change.",
+      "success": true,
+      "accuracy": true,
+      "cost_usd": 0.0,
+      "latency_s": 11.360774993896484,
+      "escalation_count": 0,
+      "steps_executed": 0,
+      "retries": 0,
+      "error": ""
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "model": "ollama/llama3.2",
+  "budget": 0.3,
+  "timestamp": "2026-02-13 20:52:43",
+  "celr_results": [
+    {
+      "task_id": "gsm8k_1",
+      "method": "celr",
+      "prompt": "A store sells notebooks for $3 each and pens for $1.50 each. Maria buys 4 notebooks and 6 pens. She pays with a $50 bill. How much change does she receive? Show your work step by step.",
+      "output": "12\n\n[Captured Code]\n# Define variables\nnotebook_price = 3\nnum_notebooks = 4\n\n# Calculate total cost using the * operator for multiplication\ntotal_cost = notebook_price * num_notebooks\n\n# Print the final result\nprint(total_cost)\nTotal cost: 9.0\n\n[Captured Code]\n# Define variables\nnum_pens = 6\ncost_per_pen = 1.50\n\n# Calculate total cost\ntotal_cost = num_pens * cost_per_pen\n\n# Print the result\nprint(\"Total cost:\", round(total_cost, 2))\nTotal Cost: $ 9.5\n\n[Captured Code]\n# Define a function to calculate total cost\ndef calculate_total_cost():\n    # Define prices and quantities of items\n    item_prices = {\n        'apple': 1.00,\n        'banana': 0.50,\n        'orange': 1.50\n    }\n    item_quantities = {\n        'apple': 2,\n        'banana': 3,\n        'orange': 4\n    }\n\n    # Initialize total cost to zero\n    total_cost = 0\n\n    # Calculate total cost by summing the product of price and quantity for each item\n    for item, quantity in item_quantities.items():\n        total_cost += item_prices[item] * quantity\n\n    # Print the final result\n    print(\"Total Cost: $\", round(total_cost, 2))\n\n# Call the function to calculate total cost\ncalculate_total_cost()\n50\n\n[Captured Code]\ndef calculate_change():\n    total_cost = 50\n    bill_given = 100\n    change = bill_given - total_cost\n    return round(change,2)\n\nprint(calculate_change())",
+      "success": true,
+      "accuracy": false,
+      "cost_usd": 0.0,
+      "latency_s": 12.272545576095581,
+      "escalation_count": 0,
+      "steps_executed": 4,
+      "retries": 0,
+      "error": ""
+    }
+  ],
+  "direct_results": [
+    {
+      "task_id": "gsm8k_1",
+      "method": "direct",
+      "prompt": "A store sells notebooks for $3 each and pens for $1.50 each. Maria buys 4 notebooks and 6 pens. She pays with a $50 bill. How much change does she receive? Show your work step by step.",
+      "output": "To calculate the total amount of change Maria will receive, we need to first find out how much she spent in total, then subtract that from the $50 bill she paid with.\n\n1. Calculate the cost of notebooks:\n   - Cost per notebook = $3\n   - Number of notebooks purchased = 4\n   - Total cost for notebooks = $3 * 4 = $12\n\n2. Calculate the cost of pens:\n   - Cost per pen = $1.50\n   - Number of pens purchased = 6\n   - Total cost for pens = $1.50 * 6 = $9\n\n3. Add the costs of notebooks and pens to get the total amount spent:\n   - Total amount spent = $12 (notebooks) + $9 (pens) = $21\n\n4. Subtract the total amount spent from the $50 bill to find the change:\n   - Change = $50 (bill) - $21 (amount spent) = $29\n\nTherefore, Maria will receive $29 in change.",
+      "success": true,
+      "accuracy": true,
+      "cost_usd": 0.0,
+      "latency_s": 9.258809089660645,
+      "escalation_count": 0,
+      "steps_executed": 0,
+      "retries": 0,
+      "error": ""
+    }
+  ]
+}
