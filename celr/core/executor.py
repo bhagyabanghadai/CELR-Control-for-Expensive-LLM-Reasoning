@@ -264,15 +264,34 @@ class TaskExecutor:
             tool_name = "python_repl"
             code = self._get_code_from_llm(step, force_expensive=force_expensive)
 
-        self.context.log(f"Dispatching to tool: {tool_name}")
-        result = self.tools.execute(tool_name, code=code)
+        # Execution-Guided Repair Loop (Phase 2)
+        max_code_retries = 3
+        last_error = None
         
-        # OPTIMIZATION for Benchmarks (HumanEval):
-        # Always output the code so the grader can check it,
-        # even if there is execution output (e.g. test prints).
-        result += f"\n\n[Captured Code]\n{code}"
+        for attempt in range(max_code_retries):
+            # If retrying, ask for fix
+            code = self._get_code_from_llm(step, force_expensive=force_expensive, error_context=last_error)
             
-        return result
+            self.context.log(f"Dispatching to tool: {tool_name} (Attempt {attempt+1}/{max_code_retries})")
+            result = self.tools.execute(tool_name, code=code)
+            
+            # Check for execution errors (simple heuristic: "Error" in output)
+            # Adjust this based on how tools.execute returns errors.
+            # Assuming tool execution returns a string that might contain traceback.
+            if "Traceback" in result or "Error:" in result or "Exception:" in result:
+                last_error = result
+                self.context.log(f"Code execution failed on attempt {attempt+1}. Retrying...")
+                continue
+            
+            # Success!
+            # OPTIMIZATION for Benchmarks (HumanEval):
+            # Always output the code so the grader can check it,
+            # even if there is execution output (e.g. test prints).
+            result += f"\n\n[Captured Code]\n{code}"
+            return result
+            
+        # If all retries failed, return the last error result (with code)
+        return f"Execution failed after {max_code_retries} attempts.\nLast Error:\n{last_error}\n\n[Captured Code]\n{code}"
 
     def _dispatch_llm(self, step: Step, force_expensive: bool = False) -> str:
         """Execute a reasoning/verification step via LLM."""
@@ -303,17 +322,34 @@ class TaskExecutor:
 
         return text
 
-    def _get_code_from_llm(self, step: Step, force_expensive: bool = False) -> str:
+    def _get_code_from_llm(self, step: Step, force_expensive: bool = False, error_context: Optional[str] = None) -> str:
         """Ask LLM to generate executable code for a tool step."""
         provider = self.escalation.get_provider(step, force_expensive=force_expensive)
-        prompt = (
+        
+        # Include recent history so the model knows results from previous steps
+        # explicitly filter for relevant information or just pass the last few steps
+        history_text = "\n".join(self.context.execution_history[-5:])
+        
+        base_prompt = (
             f"Generate Python code to accomplish this task:\n{step.description}\n\n"
+            f"Context (results from previous steps):\n{history_text}\n\n"
             f"Constraints:\n"
             f"1. Return ONLY the code, no explanation.\n"
             f"2. Do NOT use `input()`. Use variables for any values provided in the task.\n"
             f"3. The code must be self-contained and print the final result.\n"
             f"4. Use EXACT function names/signatures if specified in the task.\n"
         )
+        
+        if error_context:
+            prompt = (
+                f"{base_prompt}\n"
+                f"PREVIOUS CODE FAILED WITH ERROR:\n"
+                f"{error_context}\n"
+                f"Fix the code and output ONLY the corrected code."
+            )
+        else:
+            prompt = base_prompt
+
         code, usage = provider.generate(prompt)
         cost = provider.calculate_cost(usage)
         self.tracker.add_cost(cost)
