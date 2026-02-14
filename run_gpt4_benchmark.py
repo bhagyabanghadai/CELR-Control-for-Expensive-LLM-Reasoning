@@ -44,6 +44,8 @@ def main():
     parser = argparse.ArgumentParser(description="Run GPT-4 Benchmark with Timeout")
     parser.add_argument("--category", help="Filter by category (e.g. math, humaneval)")
     parser.add_argument("--task-id", help="Filter by specific task ID")
+    parser.add_argument("--suite", default="gpt4", help="Suite to run (standard/gpt4)")
+    parser.add_argument("--budget", type=float, default=0.3, help="Max budget per task")
     args = parser.parse_args()
 
     tasks = GPT4_BENCHMARK_TASKS
