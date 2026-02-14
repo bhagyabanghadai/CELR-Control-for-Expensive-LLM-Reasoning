@@ -23,7 +23,7 @@ dependencies = [
 ]
 
 [project.scripts]
-celr = "celr.cli:main"
+celr = "celr.cli_wrapper:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["celr"]
