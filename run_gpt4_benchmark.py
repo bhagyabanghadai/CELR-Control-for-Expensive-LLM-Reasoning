@@ -40,7 +40,21 @@ def run_with_timeout(fn, timeout, *args, **kwargs):
 
 
 def main():
+    import argparse
+    parser = argparse.ArgumentParser(description="Run GPT-4 Benchmark with Timeout")
+    parser.add_argument("--category", help="Filter by category (e.g. math, humaneval)")
+    parser.add_argument("--task-id", help="Filter by specific task ID")
+    args = parser.parse_args()
+
     tasks = GPT4_BENCHMARK_TASKS
+    if args.category:
+        tasks = [t for t in tasks if t["category"] == args.category]
+    if args.task_id:
+        tasks = [t for t in tasks if t["id"] == args.task_id]
+
+    if not tasks:
+        print("No tasks found matching criteria.")
+        return
     report = BenchmarkReport(
         model=MODEL, budget=BUDGET,
         timestamp=time.strftime("%Y-%m-%d %H:%M:%S"),

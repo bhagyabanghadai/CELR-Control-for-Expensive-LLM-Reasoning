@@ -1,0 +1,121 @@
+{
+  "model": "ollama/llama3.2",
+  "budget": 0.3,
+  "timestamp": "2026-02-13 20:14:43",
+  "celr_results": [
+    {
+      "task_id": "gsm8k_1",
+      "method": "celr",
+      "prompt": "A store sells notebooks for $3 each and pens for $1.50 each. Maria buys 4 notebooks and 6 pens. She pays with a $50 bill. How much change does she receive? Show your work step by step.",
+      "output": "Total cost of notebooks: $ 50\nTotal cost of pens: $20.0\nTotal Cost: 42.5\nChange: $ 30",
+      "success": true,
+      "accuracy": false,
+      "cost_usd": 0.0,
+      "latency_s": 10.580394983291626,
+      "escalation_count": 0,
+      "steps_executed": 4,
+      "retries": 1,
+      "error": ""
+    },
+    {
+      "task_id": "gsm8k_2",
+      "method": "celr",
+      "prompt": "A train travels at 60 mph for 2.5 hours, then at 80 mph for 1.5 hours. What is the total distance traveled? Show your work step by step.",
+      "output": "500.0\nThe distance traveled is 25.0 kilometers.\nThe speed for the second part of journey is 140.0 km/h\nThe final answer is 0.20555555555555555 km.\nTotal Distance Traveled: 30 km",
+      "success": true,
+      "accuracy": false,
+      "cost_usd": 0.0,
+      "latency_s": 11.008391857147217,
+      "escalation_count": 0,
+      "steps_executed": 5,
+      "retries": 0,
+      "error": ""
+    },
+    {
+      "task_id": "gsm8k_3",
+      "method": "celr",
+      "prompt": "A bakery makes 120 cupcakes. They sell 3/4 of them in the morning at $2.50 each, and the remaining at half price in the afternoon. How much total revenue does the bakery make? Show your work step by step.",
+      "output": "350\nDiscount Amount: $100.00\nTotal Revenue After Discount: $900.00\nTax Amount: $72.00\nFinal Revenue After Tax: $972.00\nTotal cupcakes sold in afternoon: 200\nTotal cupcakes sold in evening: 150\nTotal cupcakes sold 350\nRevenue from afternoon sales: $500.00\n2200",
+      "success": true,
+      "accuracy": false,
+      "cost_usd": 0.0,
+      "latency_s": 10.494280576705933,
+      "escalation_count": 0,
+      "steps_executed": 5,
+      "retries": 0,
+      "error": ""
+    },
+    {
+      "task_id": "gsm8k_4",
+      "method": "celr",
+      "prompt": "Tom has 3 times as many marbles as Jerry. Jerry has 5 more marbles than Sam. Sam has 8 marbles. How many marbles do they have altogether? Show your work step by step.",
+      "output": "Sam has 90 marbles.\n15\n15\nThe total number of marbles is: 300",
+      "success": true,
+      "accuracy": false,
+      "cost_usd": 0.0,
+      "latency_s": 7.92501425743103,
+      "escalation_count": 0,
+      "steps_executed": 4,
+      "retries": 0,
+      "error": ""
+    }
+  ],
+  "direct_results": [
+    {
+      "task_id": "gsm8k_1",
+      "method": "direct",
+      "prompt": "A store sells notebooks for $3 each and pens for $1.50 each. Maria buys 4 notebooks and 6 pens. She pays with a $50 bill. How much change does she receive? Show your work step by step.",
+      "output": "To find out how much change Maria receives, we need to calculate the total amount she spent on notebooks and pens, and then subtract that from the $50 bill she paid with.\n\nStep 1: Calculate the cost of notebooks\nNumber of notebooks = 4\nCost per notebook = $3\nTotal cost of notebooks = Number of notebooks x Cost per notebook\n= 4 x $3\n= $12\n\nStep 2: Calculate the cost of pens\nNumber of pens = 6\nCost per pen = $1.50\nTotal cost of pens = Number of pens x Cost per pen\n= 6 x $1.50\n= $9\n\nStep 3: Calculate the total amount spent\nTotal amount spent = Total cost of notebooks + Total cost of pens\n= $12 + $9\n= $21\n\nStep 4: Calculate the change Maria receives\nAmount paid = $50 (bill)\nChange received = Amount paid - Total amount spent\n= $50 - $21\n= $29\n\nMaria will receive $29 as change.",
+      "success": true,
+      "accuracy": true,
+      "cost_usd": 0.0,
+      "latency_s": 9.261131763458252,
+      "escalation_count": 0,
+      "steps_executed": 0,
+      "retries": 0,
+      "error": ""
+    },
+    {
+      "task_id": "gsm8k_2",
+      "method": "direct",
+      "prompt": "A train travels at 60 mph for 2.5 hours, then at 80 mph for 1.5 hours. What is the total distance traveled? Show your work step by step.",
+      "output": "To find the total distance traveled, we need to calculate the distance traveled during each segment of the trip and add them together.\n\n**Segment 1: Traveling at 60 mph for 2.5 hours**\n\nDistance = Speed x Time\n= 60 mph x 2.5 hours\n= 150 miles\n\n**Segment 2: Traveling at 80 mph for 1.5 hours**\n\nDistance = Speed x Time\n= 80 mph x 1.5 hours\n= 120 miles\n\n**Total Distance Traveled**\n\nAdd the distances traveled during each segment:\n= 150 miles + 120 miles\n= 270 miles\n\nTherefore, the total distance traveled is 270 miles.",
+      "success": true,
+      "accuracy": true,
+      "cost_usd": 0.0,
+      "latency_s": 1.8462016582489014,
+      "escalation_count": 0,
+      "steps_executed": 0,
+      "retries": 0,
+      "error": ""
+    },
+    {
+      "task_id": "gsm8k_3",
+      "method": "direct",
+      "prompt": "A bakery makes 120 cupcakes. They sell 3/4 of them in the morning at $2.50 each, and the remaining at half price in the afternoon. How much total revenue does the bakery make? Show your work step by step.",
+      "output": "To find the total revenue, we need to calculate the revenue from the morning sales and the afternoon sales separately.\n\n**Step 1: Calculate the number of cupcakes sold in the morning**\n\nThe bakery sells 3/4 of the 120 cupcakes in the morning. To calculate this:\n\n3/4 \u00d7 120 = (3 \u00d7 120) / 4\n= 360 / 4\n= 90\n\nSo, the bakery sells 90 cupcakes in the morning.\n\n**Step 2: Calculate the revenue from morning sales**\n\nThe price of each cupcake is $2.50. Since 90 cupcakes were sold at this price:\n\nRevenue (morning) = Number of cupcakes \u00d7 Price per cupcake\n= 90 \u00d7 $2.50\n= $225\n\n**Step 3: Calculate the number of cupcakes left for afternoon sales**\n\nSince 90 cupcakes were sold in the morning, the remaining number of cupcakes is:\n\n120 - 90 = 30\n\nSo, 30 cupcakes are left to be sold at half price.\n\n**Step 4: Calculate the revenue from afternoon sales**\n\nThe price of each cupcake is halved in the afternoon. Therefore, the new price per cupcake is $2.50 / 2 = $1.25.\n\nRevenue (afternoon) = Number of cupcakes \u00d7 Price per cupcake\n= 30 \u00d7 $1.25\n= $37.50\n\n**Step 5: Calculate the total revenue**\n\nThe bakery earns revenue from both morning and afternoon sales:\n\nTotal Revenue = Revenue (morning) + Revenue (afternoon)\n= $225 + $37.50\n= $262.50\n\nTherefore, the bakery makes a total of $262.50 in revenue.",
+      "success": true,
+      "accuracy": true,
+      "cost_usd": 0.0,
+      "latency_s": 4.380169868469238,
+      "escalation_count": 0,
+      "steps_executed": 0,
+      "retries": 0,
+      "error": ""
+    },
+    {
+      "task_id": "gsm8k_4",
+      "method": "direct",
+      "prompt": "Tom has 3 times as many marbles as Jerry. Jerry has 5 more marbles than Sam. Sam has 8 marbles. How many marbles do they have altogether? Show your work step by step.",
+      "output": "Let's break this problem down step by step.\n\n1. We know that Sam has 8 marbles.\n2. Since Jerry has 5 more marbles than Sam, we can add 5 to the number of marbles Sam has:\n\nJerry's marbles = Sam's marbles + 5\nJerry's marbles = 8 + 5\nJerry's marbles = 13\n\n3. Now that we know Jerry has 13 marbles and Tom has 3 times as many marbles as Jerry, we can multiply the number of marbles Jerry has by 3 to find out how many marbles Tom has:\n\nTom's marbles = Jerry's marbles x 3\nTom's marbles = 13 x 3\nTom's marbles = 39\n\n4. Now that we know each person has a certain number of marbles, we can add them up to find the total number of marbles they have altogether:\n\nTotal marbles = Sam's marbles + Jerry's marbles + Tom's marbles\nTotal marbles = 8 + 13 + 39\nTotal marbles = 60\n\nTherefore, Tom, Jerry, and Sam have a total of 60 marbles.",
+      "success": true,
+      "accuracy": true,
+      "cost_usd": 0.0,
+      "latency_s": 3.117466688156128,
+      "escalation_count": 0,
+      "steps_executed": 0,
+      "retries": 0,
+      "error": ""
+    }
+  ]
+}
