@@ -100,10 +100,21 @@ class LiteLLMProvider(BaseLLMProvider):
             messages.append({"role": "system", "content": system_prompt})
         messages.append({"role": "user", "content": prompt})
 
+        # Optimization: Pass Ollama-specific parameters if applicable
+        kwargs = {}
+        if self.config.provider == "ollama":
+            # LiteLLM passes extra params to Ollama via 'options' or top-level depending on version
+            # For recent LiteLLM/Ollama, 'num_ctx' works as a top-level param or inside options.
+            # We'll use the standard litellm convention.
+            kwargs["num_ctx"] = self.config.ollama_num_ctx
+            # keep_alive is passed as a top-level parameter to Ollama API
+            kwargs["keep_alive"] = self.config.ollama_keep_alive
+
         try:
             response = litellm.completion(
                 model=self.config.name,
                 messages=messages,
+                **kwargs
             )
 
             text = response.choices[0].message.content or ""

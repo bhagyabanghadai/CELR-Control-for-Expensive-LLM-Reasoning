@@ -99,4 +99,9 @@ class ModelConfig(BaseModel):
     
     # Capabilities
     supports_tools: bool = False
+    supports_tools: bool = False
     is_reasoning_model: bool = False # e.g. o1
+
+    # Optimization
+    ollama_num_ctx: Optional[int] = 4096
+    ollama_keep_alive: Optional[str] = "5m"
