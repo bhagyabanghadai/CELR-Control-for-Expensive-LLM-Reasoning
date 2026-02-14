@@ -280,7 +280,7 @@ def run_celr(task: dict, model: str, budget: float) -> TaskResult:
     return result
 
 
-def run_benchmark(model: str = "gpt-4o-mini", budget: float = 0.50, tasks=None, suite: str = "standard"):
+def run_benchmark(model: str = "gpt-4o-mini", budget: float = 0.50, tasks=None, suite: str = "standard", output_file: str = None):
     """Run the full benchmark suite."""
     if tasks is None:
         tasks = GPT4_BENCHMARK_TASKS if suite == "gpt4" else BENCHMARK_TASKS
@@ -314,8 +314,13 @@ def run_benchmark(model: str = "gpt-4o-mini", budget: float = 0.50, tasks=None, 
     print(report.summary(tasks=tasks))
 
     # Save results
-    os.makedirs("benchmarks/results", exist_ok=True)
-    results_file = f"benchmarks/results/benchmark_{suite}_{int(time.time())}.json"
+    if output_file:
+        results_file = output_file
+        os.makedirs(os.path.dirname(results_file) or ".", exist_ok=True)
+    else:
+        os.makedirs("benchmarks/results", exist_ok=True)
+        results_file = f"benchmarks/results/benchmark_{suite}_{int(time.time())}.json"
+        
     with open(results_file, "w") as f:
         json.dump(asdict(report), f, indent=2, default=str)
     logger.info(f"Results saved to {results_file}")
@@ -330,6 +335,8 @@ def main():
     parser.add_argument("--suite", choices=["standard", "gpt4"], default="standard", help="Task suite: standard (12 tasks) or gpt4 (20 GPT-4-level tasks)")
     parser.add_argument("--category", help="Filter by category (e.g. mmlu, humaneval, gsm8k, arc, math)")
     parser.add_argument("--difficulty", choices=["easy", "medium", "hard"], help="Filter by difficulty (standard suite only)")
+    parser.add_argument("--max_tasks", type=int, help="Limit number of tasks to run")
+    parser.add_argument("--output_file", help="Specific output file path")
     parser.add_argument("--dry-run", action="store_true", help="Print tasks without running")
     args = parser.parse_args()
 
@@ -341,6 +348,10 @@ def main():
         tasks = BENCHMARK_TASKS
         if args.difficulty:
             tasks = [t for t in tasks if t["difficulty"] == args.difficulty]
+
+    # Max tasks limit
+    if args.max_tasks and args.max_tasks > 0:
+        tasks = tasks[:args.max_tasks]
 
     if args.dry_run:
         suite_label = "GPT-4 Level" if args.suite == "gpt4" else "Standard"
@@ -357,7 +368,7 @@ def main():
                 print(f"  {cat.upper():<12} {score:.1f}%")
         return
 
-    run_benchmark(model=args.model, budget=args.budget, tasks=tasks, suite=args.suite)
+    run_benchmark(model=args.model, budget=args.budget, tasks=tasks, suite=args.suite, output_file=args.output_file)
 
 
 if __name__ == "__main__":

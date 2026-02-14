@@ -159,6 +159,58 @@ GPT4_BENCHMARK_TASKS = [
         "expected_contains": ["def max_profit", "return"],
         "max_budget": 0.20,
     },
+    {
+        "id": "humaneval_5",
+        "prompt": ("Write a Python function called `is_palindrome` that takes a string "
+                   "and returns True if it reads the same forwards and backwards. "
+                   "Ignore case and non-alphanumeric characters.\n\n"
+                   "Example: is_palindrome('Race car') -> True"),
+        "category": "humaneval",
+        "correct_answer": "def is_palindrome",
+        "expected_contains": ["def is_palindrome", "return"],
+        "max_budget": 0.20,
+    },
+    {
+        "id": "humaneval_6",
+        "prompt": ("Write a Python function called `fibonacci` that takes an integer n "
+                   "and returns the nth Fibonacci number. "
+                   "The sequence starts with 0, 1. (0, 1, 1, 2, 3...)\n\n"
+                   "Example: fibonacci(5) -> 5"),
+        "category": "humaneval",
+        "correct_answer": "def fibonacci",
+        "expected_contains": ["def fibonacci", "return"],
+        "max_budget": 0.20,
+    },
+    {
+        "id": "humaneval_7",
+        "prompt": ("Write a Python function called `parse_nested_parens` that takes a string "
+                   "of nested parentheses and returns the maximum depth of nesting.\n\n"
+                   "Example: parse_nested_parens('(()(())())') -> 3"),
+        "category": "humaneval",
+        "correct_answer": "def parse_nested_parens",
+        "expected_contains": ["def parse_nested_parens", "return"],
+        "max_budget": 0.20,
+    },
+    {
+        "id": "humaneval_8",
+        "prompt": ("Write a Python function called `find_closest_elements` that takes a list of numbers, "
+                   "a target number, and an integer k, and returns the k elements closest to the target.\n\n"
+                   "Example: find_closest_elements([1, 2, 3, 4, 5], 3, 2) -> [2, 4]"),
+        "category": "humaneval",
+        "correct_answer": "def find_closest_elements",
+        "expected_contains": ["def find_closest_elements", "return"],
+        "max_budget": 0.20,
+    },
+    {
+        "id": "humaneval_9",
+        "prompt": ("Write a Python function called `sort_by_frequency` that takes a list of integers "
+                   "and returns a list sorted by frequency (ascending). Ties should be broken by value.\n\n"
+                   "Example: sort_by_frequency([4, 6, 2, 6, 4, 4, 6]) -> [2, 4, 4, 4, 6, 6, 6]"),
+        "category": "humaneval",
+        "correct_answer": "def sort_by_frequency",
+        "expected_contains": ["def sort_by_frequency", "return"],
+        "max_budget": 0.20,
+    },
 
     # ═══════════════════════════════════════════════════════════════
     # 3. GSM8K — Grade School Math (GPT-4: 92.0%)
@@ -209,6 +261,68 @@ GPT4_BENCHMARK_TASKS = [
         "category": "gsm8k",
         "correct_answer": "60",
         "expected_contains": ["60"],
+        "max_budget": 0.15,
+    },
+    {
+        "id": "gsm8k_5",
+        "prompt": (
+            "Henry made two stops during his 60-mile bike trip. He first stopped after 20 miles. "
+            "His second stop was 15 miles before the end of the trip. "
+            "How many miles did he travel between his first and second stops?"
+        ),
+        "category": "gsm8k",
+        "correct_answer": "25",
+        "expected_contains": ["25"],
+        "max_budget": 0.15,
+    },
+    {
+        "id": "gsm8k_6",
+        "prompt": (
+            "Joy can read 8 pages of a book in 20 minutes. "
+            "How many hours will it take her to read 120 pages?"
+        ),
+        "category": "gsm8k",
+        "correct_answer": "5",
+        "expected_contains": ["5"],
+        "max_budget": 0.15,
+    },
+    {
+        "id": "gsm8k_7",
+        "prompt": (
+            "In a truck, there are 26 pink hard hats, 15 green hard hats, and 24 yellow hard hats. "
+            "If Carl takes away 4 pink hard hats, and John takes away 6 pink hard hats "
+            "and twice as many green hard hats as the number of pink hard hats that he removed, "
+            "then calculate the total number of hard hats that remained in the truck."
+        ),
+        "category": "gsm8k",
+        "correct_answer": "43",
+        "expected_contains": ["43"],
+        "max_budget": 0.15,
+    },
+    {
+        "id": "gsm8k_8",
+        "prompt": (
+            "A craft store makes a third of its sales in the fabric section, "
+            "a quarter of its sales in the jewelry section, and the rest in the stationery section. "
+            "They made 36 sales today. How many sales were in the stationery section?"
+        ),
+        "category": "gsm8k",
+        "correct_answer": "15",
+        "expected_contains": ["15"],
+        "max_budget": 0.15,
+    },
+    {
+        "id": "gsm8k_9",
+        "prompt": (
+            "Janice can type 6 sentences per minute. Today at work, she typed for 20 minutes, "
+            "took a break, and typed 15 minutes longer. She then had to erase 40 sentences she typed incorrectly. "
+            "After a meeting, she typed for 18 minutes more. "
+            "In all, the paper had 536 sentences by the end of today. "
+            "How many sentences did she start with today?"
+        ),
+        "category": "gsm8k",
+        "correct_answer": "258",
+        "expected_contains": ["258"],
         "max_budget": 0.15,
     },
 
