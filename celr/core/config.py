@@ -54,6 +54,10 @@ class CELRConfig(BaseSettings):
     max_output_bytes: int = Field(default=10240, description="Max tool output size")
     exec_timeout_seconds: int = Field(default=10, description="Tool execution timeout")
 
+    # Optimization (Ollama)
+    ollama_num_ctx: int = Field(default=4096, description="Ollama context window (lower to save VRAM)")
+    ollama_keep_alive: str = Field(default="5m", description="How long to keep model loaded (e.g. 5m, 0)")
+
     def get_model_tiers(self) -> List[ModelConfig]:
         """Build the model tier list from config values."""
         return [
@@ -62,6 +66,8 @@ class CELRConfig(BaseSettings):
                 provider=self._infer_provider(self.small_model),
                 cost_per_million_input_tokens=0.0,
                 cost_per_million_output_tokens=0.0,
+                ollama_num_ctx=self.ollama_num_ctx,
+                ollama_keep_alive=self.ollama_keep_alive,
             ),
             ModelConfig(
                 name=self.mid_model,
