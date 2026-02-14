@@ -62,6 +62,10 @@ class TaskExecutor:
         self.verifier = verifier
         self.reflection = reflection
         
+        # Phase 5: Stateful Runtime
+        from celr.core.runtime import PersistentRuntime
+        self.runtime = PersistentRuntime()
+        
         # Phase 8: Adaptive Cortex
         self.state_extractor = StateExtractor()
         self.policy = MetaPolicy()
@@ -282,12 +286,13 @@ class TaskExecutor:
                 continue # Skip execution, retry with fix
             
             self.context.log(f"Dispatching to tool: {tool_name} (Attempt {attempt+1}/{max_code_retries})")
-            result = self.tools.execute(tool_name, code=code)
             
-            # Check for execution errors (simple heuristic: "Error" in output)
-            # Adjust this based on how tools.execute returns errors.
-            # Assuming tool execution returns a string that might contain traceback.
-            if "Traceback" in result or "Error:" in result or "Exception:" in result:
+            # Phase 5: Stateful Execution
+            # Execute code in persistent runtime
+            result, success = self.runtime.execute(code)
+            
+            # Check for execution errors
+            if not success:
                 last_error = result
                 self.context.log(f"Code execution failed on attempt {attempt+1}. Retrying...")
                 continue
@@ -335,29 +340,49 @@ class TaskExecutor:
         """Ask LLM to generate executable code for a tool step."""
         provider = self.escalation.get_provider(step, force_expensive=force_expensive)
         
+        # Phase 5: Stateful Prompting
+        # Get current variable state from runtime
+        runtime_context = self.runtime.get_context_snapshot()
+        
         # Include recent history so the model knows results from previous steps
-        # explicitly filter for relevant information or just pass the last few steps
         history_text = "\n".join(self.context.execution_history[-5:])
         
+        # Phase 6: Multi-Agent "Team of Experts" Routing
+        from celr.core.agents import AgentFactory
+        assigned_role = self.context.shared_state.get("assigned_agent", "CODER")
+        specialist = AgentFactory.get_agent(assigned_role)
+        
+        # Base Prompt updated for Simulated REPL with Ground Truth
+        # We append the Specialist System Prompt to the Base Prompt
+        
         base_prompt = (
-            f"Generate Python code to accomplish this task:\n{step.description}\n\n"
-            f"Context (results from previous steps):\n{history_text}\n\n"
+            f"Original User Task:\n{self.context.original_request}\n\n"
+            f"Current Step Task:\n{step.description}\n\n"
+            f"Active Variables (DO NOT REDEFINE THESE):\n{runtime_context}\n\n"
+            f"Recent Output History:\n{history_text}\n\n"
             f"Constraints:\n"
             f"1. Return ONLY the code, no explanation.\n"
-            f"2. Do NOT use `input()`. Use variables for any values provided in the task.\n"
-            f"3. The code must be self-contained and print the final result.\n"
-            f"4. Use EXACT function names/signatures if specified in the task.\n"
+            f"2. Use existing variables from 'Active Variables' directly.\n"
+            f"3. Do NOT use `input()`. Use variables for values.\n"
+            f"4. Print the final result explicitly.\n"
+            f"5. Extract numbers/data from 'Original User Task' if not in 'Active Variables'.\n"
+        )
+        
+        # Inject the Specialist System Prompt
+        full_prompt = (
+            f"{specialist.system_prompt}\n\n"
+            f"{base_prompt}"
         )
         
         if error_context:
             prompt = (
-                f"{base_prompt}\n"
+                f"{full_prompt}\n"
                 f"PREVIOUS CODE FAILED WITH ERROR:\n"
                 f"{error_context}\n"
                 f"Fix the code and output ONLY the corrected code."
             )
         else:
-            prompt = base_prompt
+            prompt = full_prompt
 
         code, usage = provider.generate(prompt)
         cost = provider.calculate_cost(usage)
@@ -371,15 +396,21 @@ class TaskExecutor:
 
     def _verify_step_semantics(self, step: Step, code: str, force_expensive: bool = False) -> str:
         """
-        Phase 3: Recursive Self-Correction.
-        Asks the LLM to verify if the generated code matches the prompt's specific numbers/data.
+        Phase 3: Recursive Self-Correction (CRITIC AGENT).
+        Asks the CRITIC Agent to verify if the generated code matches the prompt's specific numbers/data.
         Returns "CORRECT" or "MISMATCH: explanation".
         """
-        provider = self.escalation.get_provider(step, force_expensive=force_expensive)
+        from celr.core.agents import AgentFactory
         
-        prompt = SEMANTIC_VERIFICATION_PROMPT.format(
-            user_prompt=step.description,
-            code=code
+        provider = self.escalation.get_provider(step, force_expensive=force_expensive)
+        critic = AgentFactory.get_agent("CRITIC")
+        
+        # Combine Critic System Prompt with the specific verification task
+        prompt = (
+            f"{critic.system_prompt}\n\n"
+            f"User Request: {step.description}\n"
+            f"Generated Logic/Code:\n{code}\n\n"
+            f"Analyze strict compliance."
         )
         
         response, usage = provider.generate(prompt)
