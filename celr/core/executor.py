@@ -26,6 +26,7 @@ from celr.core.escalation import EscalationManager
 from celr.core.exceptions import BudgetExhaustedError, ToolExecutionError
 from celr.core.llm import BaseLLMProvider, LLMUsage
 from celr.core.planner import Planner
+from celr.core.prompts import SEMANTIC_VERIFICATION_PROMPT
 from celr.core.reflection import SelfReflection
 from celr.core.tools import ToolRegistry
 from celr.core.types import Plan, Step, StepType, TaskContext, TaskStatus
@@ -272,6 +273,14 @@ class TaskExecutor:
             # If retrying, ask for fix
             code = self._get_code_from_llm(step, force_expensive=force_expensive, error_context=last_error)
             
+            # [Phase 3] Semantic Verification (Recursive Self-Correction)
+            # Before executing, check if the code matches the prompt's data exactly.
+            verification_result = self._verify_step_semantics(step, code, force_expensive=force_expensive)
+            if verification_result.startswith("MISMATCH"):
+                last_error = f"Semantic Verification Failed: {verification_result}\nPlease fix the code to match the user request exactly."
+                self.context.log(f"Semantic Check Failed: {verification_result}")
+                continue # Skip execution, retry with fix
+            
             self.context.log(f"Dispatching to tool: {tool_name} (Attempt {attempt+1}/{max_code_retries})")
             result = self.tools.execute(tool_name, code=code)
             
@@ -359,3 +368,23 @@ class TaskExecutor:
             code = code.replace("```python", "").replace("```py", "").replace("```", "").strip()
             
         return code
+
+    def _verify_step_semantics(self, step: Step, code: str, force_expensive: bool = False) -> str:
+        """
+        Phase 3: Recursive Self-Correction.
+        Asks the LLM to verify if the generated code matches the prompt's specific numbers/data.
+        Returns "CORRECT" or "MISMATCH: explanation".
+        """
+        provider = self.escalation.get_provider(step, force_expensive=force_expensive)
+        
+        prompt = SEMANTIC_VERIFICATION_PROMPT.format(
+            user_prompt=step.description,
+            code=code
+        )
+        
+        response, usage = provider.generate(prompt)
+        # Track verifying cost
+        cost = provider.calculate_cost(usage)
+        self.tracker.add_cost(cost)
+        
+        return response.strip()
