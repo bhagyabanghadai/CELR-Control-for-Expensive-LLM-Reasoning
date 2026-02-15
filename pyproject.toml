@@ -19,8 +19,10 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "networkx>=3.0",  # For DAG handling in plans
     "tenacity>=8.0.0",  # Retry with exponential backoff for LLM calls
-    "numpy>=1.24.0",  # For vector similarity (Active Memory)
-    "torch>=2.0.0",   # For Adaptive Cortex (Nano-Decision Transformer)
+    "numpy>=1.24.0",   # For vector similarity (Active Memory)
+    "torch>=2.0.0",    # For Adaptive Cortex (Nano-Decision Transformer)
+    "streamlit>=1.32.0", # For Cerebro War Room Dashboard (Phase 9)
+    "pandas>=2.0.0",   # For Cerebro charts and data frames
 ]
 
 [project.scripts]
