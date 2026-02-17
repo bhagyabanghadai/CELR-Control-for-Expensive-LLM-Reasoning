@@ -32,7 +32,8 @@ from celr.core.tools import ToolRegistry
 from celr.core.types import Plan, Step, StepType, TaskContext, TaskStatus
 from celr.core.verifier import Verifier
 from celr.cortex import StateExtractor, MetaPolicy
-from celr.cortex.policy import CortexAction # Explicit import
+from celr.cortex.policy import CortexAction  # Explicit import
+from celr.cortex.council import HiveMindCouncil, Verdict  # Phase 9: Hive-Mind
 
 logger = logging.getLogger(__name__)
 
@@ -70,6 +71,9 @@ class TaskExecutor:
         self.state_extractor = StateExtractor()
         self.policy = MetaPolicy()
         self.current_plan: Optional[Plan] = None
+
+        # Phase 9: Hive-Mind Council (lazy-init, only used on ESCALATE)
+        self._council: Optional[HiveMindCouncil] = None
 
     def run(self, plan: Plan) -> str:
         """
@@ -168,13 +172,32 @@ class TaskExecutor:
                     break # Stop retries
                 
                 elif action == CortexAction.ESCALATE:
-                    self.context.log("⚡ Cortex triggered ESCALATION (forcing stronger model)")
-                    force_expensive = True
-                
+                    # ── Phase 9: Hive-Mind Council deliberation ──────────
+                    # Before committing to the expensive model, ask the
+                    # Council of Experts to vote on whether escalation is
+                    # truly needed.  All three critics fire in PARALLEL.
+                    if self._council is None:
+                        self._council = HiveMindCouncil()
+                    proposal = (
+                        f"Should we escalate step '{step.description}' "
+                        f"(attempt {attempt + 1}) to a more expensive model? "
+                        f"Budget remaining: ${self.tracker.remaining:.4f}"
+                    )
+                    debate = self._council.deliberate(proposal)
+                    self.context.log(f"🧠 {debate.summary}")
+                    logger.info(f"Council verdict: {debate.final_verdict.value}")
+
+                    if debate.final_verdict == Verdict.APPROVE:
+                        self.context.log("⚡ Council approved ESCALATION → using stronger model")
+                        force_expensive = True
+                    else:
+                        self.context.log("🚫 Council REJECTED escalation → staying with cheap model")
+                        force_expensive = False
+                    # ─────────────────────────────────────────────────────
+
                 elif action == CortexAction.STOP:
-                    # Rare case: Early success prediction? 
-                    # For now, treat as "skip execution if we think we assume success", 
-                    # but mostly this action is for higher level loops.
+                    # Rare case: Early success prediction?
+                    # For now, treat as proceed normally.
                     pass
 
                 # 3. Budget check (Legacy safety net)
