@@ -8,6 +8,9 @@ so individual test files can focus on behavior, not setup.
 import pytest
 from unittest.mock import MagicMock, patch
 
+# Configure pytest-asyncio to auto-detect async test functions
+pytest_plugins = ["pytest_asyncio"]
+
 from celr.core.types import TaskContext, Plan, Step, StepType, TaskStatus, ModelConfig
 from celr.core.llm import BaseLLMProvider, LLMUsage, LiteLLMProvider
 from celr.core.cost_tracker import CostTracker
