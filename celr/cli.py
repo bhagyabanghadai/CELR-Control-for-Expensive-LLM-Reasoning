@@ -51,6 +51,7 @@ Examples:
     parser.add_argument("--verbose", action="store_true", help="Enable debug logging")
     parser.add_argument("--small-model", type=str, default=None, help="Override small model name")
     parser.add_argument("--large-model", type=str, default=None, help="Override large model name")
+    parser.add_argument("--ui", action="store_true", help="Launch Cerebro war room dashboard")
     args = parser.parse_args()
 
     # 1. Load Config (env vars → .env file → CLI args override)
@@ -66,6 +67,17 @@ Examples:
 
     config = CELRConfig(**config_overrides)
     config.setup_logging()
+
+    # Phase 9: Launch Cerebro dashboard in background if --ui
+    if getattr(args, "ui", False):
+        import subprocess, sys as _sys
+        dashboard_path = Path(__file__).parent / "interface" / "dashboard.py"
+        subprocess.Popen(
+            [_sys.executable, "-m", "streamlit", "run", str(dashboard_path),
+             "--server.headless", "true"],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+        console.print("[bold magenta]🧠 Cerebro launched → http://localhost:8501[/bold magenta]")
 
     # 2. Rich header
     console.print(Panel(
