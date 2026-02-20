@@ -26,6 +26,7 @@ from celr.core.escalation import EscalationManager
 from celr.core.exceptions import BudgetExhaustedError, ToolExecutionError
 from celr.core.llm import BaseLLMProvider, LLMUsage
 from celr.core.planner import Planner
+from celr.core.logger import TrajectoryLogger
 from celr.core.prompts import SEMANTIC_VERIFICATION_PROMPT
 from celr.core.reflection import SelfReflection
 from celr.core.tools import ToolRegistry
@@ -53,7 +54,9 @@ class TaskExecutor:
         escalation_manager: EscalationManager,
         tool_registry: ToolRegistry,
         verifier: Verifier,
+        verifier: Verifier,
         reflection: SelfReflection,
+        trajectory_logger: Optional[TrajectoryLogger] = None,
     ):
         self.context = context
         self.planner = planner
@@ -62,6 +65,7 @@ class TaskExecutor:
         self.tools = tool_registry
         self.verifier = verifier
         self.reflection = reflection
+        self.trajectory_logger = trajectory_logger
         
         # Phase 5: Stateful Runtime
         from celr.core.runtime import PersistentRuntime
@@ -109,7 +113,12 @@ class TaskExecutor:
                 # Pending steps but none runnable = cycle or bug
                 self.context.log("Stuck! No runnable steps but plan is not complete.")
                 logger.error("Execution stuck: no runnable steps")
+                if self.trajectory_logger:
+                    self.trajectory_logger.update(self.context, plan, "STUCK")
                 return "STUCK"
+
+            if self.trajectory_logger:
+                self.trajectory_logger.update(self.context, plan, "RUNNING")
 
             for step in runnable_steps:
                 try:
@@ -141,6 +150,10 @@ class TaskExecutor:
             if attempt > 0:
                 self.context.log(f"Retry {attempt}/{step.max_retries} for step {step.id}")
                 logger.info(f"Retry {attempt}/{step.max_retries} for step {step.id}")
+            
+            # Live update start of step attempt
+            if self.trajectory_logger and self.current_plan:
+                self.trajectory_logger.update(self.context, self.current_plan, "RUNNING")
 
             try:
                 # --- Phase 8: Adaptive Cortex Decision ---
@@ -193,6 +206,10 @@ class TaskExecutor:
                     else:
                         self.context.log("🚫 Council REJECTED escalation → staying with cheap model")
                         force_expensive = False
+                    
+                    # Update dashboard with debate results
+                    if self.trajectory_logger:
+                        self.trajectory_logger.update(self.context, self.current_plan, "RUNNING")
                     # ─────────────────────────────────────────────────────
 
                 elif action == CortexAction.STOP:

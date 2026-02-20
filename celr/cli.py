@@ -124,6 +124,7 @@ Examples:
         tool_registry=tool_registry,
         verifier=verifier,
         reflection=reflection,
+        trajectory_logger=trajectory_logger,
     )
 
     # 4. Execute
