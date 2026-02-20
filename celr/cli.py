@@ -11,6 +11,7 @@ import argparse
 import logging
 import sys
 
+from pathlib import Path
 from dotenv import load_dotenv
 from rich.console import Console
 from rich.panel import Panel
