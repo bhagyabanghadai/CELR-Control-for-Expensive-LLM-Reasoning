@@ -43,11 +43,29 @@ def run_init():
     else:
         print("\nℹ️  No API keys provided. CELR will use local Ollama models by default.")
 
-def run_task(prompt: str, budget: float):
+def run_task(prompt: str, budget: float, ui: bool, verbose: bool, small: str, mid: str, large: str):
     """Run a headless task via celr.cli module."""
     # We use subprocess to run the module so it picks up the environment correctly
-    cmd = [sys.executable, "-m", "celr.cli", prompt, "--budget", str(budget)]
-    subprocess.run(cmd)
+    cmd = [sys.executable, "-m", "celr.cli", prompt]
+    if budget:
+        cmd.extend(["--budget", str(budget)])
+    if ui:
+        cmd.append("--ui")
+    if verbose:
+        cmd.append("--verbose")
+    if small:
+        cmd.extend(["--small-model", small])
+    if large:
+        cmd.extend(["--large-model", large])
+    # Note: celr.cli doesn't have --mid-model flag yet, but we can pass it via env if needed,
+    # or just rely on config/env vars for that.
+    
+    # Pass mid model via environment variable if specified
+    env = os.environ.copy()
+    if mid:
+        env["CELR_MID_MODEL"] = mid
+
+    subprocess.run(cmd, env=env)
 
 def run_chat():
     """Launch the interactive chat TUI."""
@@ -68,7 +86,12 @@ def main():
     # celr run "task"
     run_parser = subparsers.add_parser("run", help="Execute a task")
     run_parser.add_argument("prompt", help="The task prompt")
-    run_parser.add_argument("--budget", type=float, default=0.50, help="Max budget in USD")
+    run_parser.add_argument("--budget", type=float, default=None, help="Max budget in USD")
+    run_parser.add_argument("--ui", action="store_true", help="Launch Cerebro war room dashboard")
+    run_parser.add_argument("--verbose", action="store_true", help="Enable debug logging")
+    run_parser.add_argument("--small-model", type=str, default=None, help="Override small/reasoning model")
+    run_parser.add_argument("--mid-model", type=str, default=None, help="Override mid-tier model")
+    run_parser.add_argument("--large-model", type=str, default=None, help="Override large/expensive model")
 
     # celr chat
     subparsers.add_parser("chat", help="Launch interactive chat")
@@ -78,7 +101,15 @@ def main():
     if args.command == "init":
         run_init()
     elif args.command == "run":
-        run_task(args.prompt, args.budget)
+        run_task(
+            args.prompt, 
+            args.budget, 
+            args.ui, 
+            args.verbose, 
+            args.small_model, 
+            args.mid_model, 
+            args.large_model
+        )
     elif args.command == "chat":
         run_chat()
     else:
