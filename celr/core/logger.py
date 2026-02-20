@@ -8,8 +8,8 @@ logger = logging.getLogger(__name__)
 
 class TrajectoryLogger:
     def __init__(self, log_dir: str = ".celr_logs"):
-        self.log_dir = log_dir
-        self.traj_dir = os.path.join(log_dir, "Traj")
+        self.log_dir = os.path.abspath(log_dir)
+        self.traj_dir = os.path.join(self.log_dir, "Traj")
         os.makedirs(self.traj_dir, exist_ok=True)
         # Unique live file for this session
         self.live_file = os.path.join(self.traj_dir, f"celr_live_{int(datetime.now().timestamp())}.json")
