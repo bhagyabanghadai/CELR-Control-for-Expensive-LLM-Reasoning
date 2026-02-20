@@ -202,6 +202,9 @@ class TaskExecutor:
                     self.context.log(f"🧠 {debate.summary}")
                     logger.info(f"Council verdict: {debate.final_verdict.value}")
 
+                    # Store debate in context for dashboard
+                    self.context.council_debates.append(debate.model_dump())
+
                     if debate.final_verdict == Verdict.APPROVE:
                         self.context.log("⚡ Council approved ESCALATION → using stronger model")
                         force_expensive = True
