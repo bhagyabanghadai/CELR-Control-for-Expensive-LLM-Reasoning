@@ -54,7 +54,6 @@ class TaskExecutor:
         escalation_manager: EscalationManager,
         tool_registry: ToolRegistry,
         verifier: Verifier,
-        verifier: Verifier,
         reflection: SelfReflection,
         trajectory_logger: Optional[TrajectoryLogger] = None,
     ):
