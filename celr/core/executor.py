@@ -171,6 +171,9 @@ class TaskExecutor:
                     retry_count=attempt
                 )
                 
+                # Save state for logging/dashboard
+                step._last_state_vector = state.tolist()
+
                 # 2. Get Action from Policy
                 action = self.policy.get_action(state)
                 logger.info(f"Cortex Action for step {step.id}: {action}")
