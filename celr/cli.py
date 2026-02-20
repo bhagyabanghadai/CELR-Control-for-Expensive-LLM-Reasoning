@@ -29,6 +29,7 @@ from celr.core.reflection import SelfReflection
 from celr.core.tools import ToolRegistry
 from celr.core.types import TaskContext
 from celr.core.verifier import Verifier
+from celr.training.self_reward import SelfRewardScorer  # Phase 10: Online TRM
 
 logger = logging.getLogger(__name__)
 console = Console()
@@ -115,6 +116,10 @@ Examples:
     # Reflection uses the same cheap model
     reflection = SelfReflection(llm=verifier_llm)
 
+    # Phase 10: Online Self-Reward Scorer (Samsung TRM)
+    # Uses the small model for fast, recursive self-grading
+    self_reward_scorer = SelfRewardScorer(llm=verifier_llm)
+
     # Build the executor with ALL components wired
     executor = TaskExecutor(
         context=context,
@@ -125,11 +130,13 @@ Examples:
         verifier=verifier,
         reflection=reflection,
         trajectory_logger=trajectory_logger,
+        self_reward_scorer=self_reward_scorer,
     )
 
     # 4. Execute
     console.print(f"\n[bold]Task:[/bold] {args.task}\n")
 
+    plan = None
     try:
         with console.status("[bold green]Planning...", spinner="dots"):
             plan = planner.create_initial_plan(context)
@@ -180,15 +187,16 @@ Examples:
     result_table.add_row("Status", f"[{color}]{final_status}[/{color}]")
     result_table.add_row("Total Cost", f"${context.current_spread_usd:.6f}")
     result_table.add_row("Budget Remaining", f"${context.budget_remaining:.6f}")
-    result_table.add_row("Steps", str(len(plan.items) if 'plan' in dir() else "N/A"))
+    result_table.add_row("Steps", str(len(plan.items)) if plan else "N/A")
     console.print(result_table)
 
     # 6. Save trajectory
-    try:
-        trajectory_logger.save_trajectory(context, plan, final_status)
-        console.print(f"\n[dim]Trajectory saved to {config.log_dir}/[/dim]")
-    except Exception as e:
-        logger.warning(f"Failed to save trajectory: {e}")
+    if plan:
+        try:
+            trajectory_logger.save_trajectory(context, plan, final_status)
+            console.print(f"\n[dim]Trajectory saved to {config.log_dir}/[/dim]")
+        except Exception as e:
+            logger.warning(f"Failed to save trajectory: {e}")
 
     # Exit code
     sys.exit(0 if final_status == "SUCCESS" else 1)

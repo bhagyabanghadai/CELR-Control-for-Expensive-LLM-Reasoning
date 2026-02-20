@@ -35,6 +35,7 @@ from celr.core.verifier import Verifier
 from celr.cortex import StateExtractor, MetaPolicy
 from celr.cortex.policy import CortexAction  # Explicit import
 from celr.cortex.council import HiveMindCouncil, Verdict  # Phase 9: Hive-Mind
+from celr.training.self_reward import SelfRewardScorer  # Phase 10: Online TRM
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +57,7 @@ class TaskExecutor:
         verifier: Verifier,
         reflection: SelfReflection,
         trajectory_logger: Optional[TrajectoryLogger] = None,
+        self_reward_scorer: Optional[SelfRewardScorer] = None,
     ):
         self.context = context
         self.planner = planner
@@ -65,6 +67,7 @@ class TaskExecutor:
         self.verifier = verifier
         self.reflection = reflection
         self.trajectory_logger = trajectory_logger
+        self.self_reward_scorer = self_reward_scorer
         
         # Phase 5: Stateful Runtime
         from celr.core.runtime import PersistentRuntime
@@ -241,6 +244,31 @@ class TaskExecutor:
                      result = self._dispatch_llm(step, force_expensive)
                 
                 step.output = result
+
+                # --- Phase 10: Online Self-Reward (TRM) ---
+                # Score the quality of the output before final verification
+                if self.self_reward_scorer:
+                    trm_score = 1.0  # default pass if scorer fails
+                    try:
+                        trm_score = self.self_reward_scorer.score_response(step.description, result)
+                        self.context.log(f"🧠 Self-Reward Score: {trm_score:.2f}")
+                        logger.info(f"Step {step.id} TRM Score: {trm_score:.2f}")
+
+                        # Store for logging
+                        if step.metadata is None:
+                            step.metadata = {}
+                        step.metadata["quality_score"] = trm_score
+
+                    except Exception as e:
+                        logger.warning(f"Self-reward scoring call failed: {e}")
+
+                    # Quality Gate (OUTSIDE inner try/except so it propagates)
+                    if trm_score < 0.6:
+                        # Soft Fail — Force Reflexion even if tool ran OK
+                        raise ToolExecutionError(
+                            f"Low TRM Quality Score ({trm_score:.2f} < 0.6). "
+                            f"Retrying with Reflexion to improve accuracy/completeness."
+                        )
 
                 # 3. Verify
                 is_valid = self.verifier.verify(step, self.context)
