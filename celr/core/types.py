@@ -80,6 +80,7 @@ class TaskContext(BaseModel):
     # Global memory/state
     shared_state: Dict[str, Any] = Field(default_factory=dict)
     execution_history: List[str] = Field(default_factory=list) # Log of events
+    council_debates: List[Dict[str, Any]] = Field(default_factory=list) # Phase 9: Council logs
     
     def log(self, message: str):
         ts = datetime.now().isoformat()
