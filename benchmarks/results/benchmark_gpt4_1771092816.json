@@ -1,0 +1,37 @@
+{
+  "model": "ollama/llama3.2",
+  "budget": 0.3,
+  "timestamp": "2026-02-14 13:13:21",
+  "celr_results": [
+    {
+      "task_id": "gsm8k_1",
+      "method": "celr",
+      "prompt": "A store sells notebooks for $3 each and pens for $1.50 each. Maria buys 4 notebooks and 6 pens. She pays with a $50 bill. How much change does she receive? Show your work step by step.",
+      "output": "",
+      "success": false,
+      "accuracy": false,
+      "cost_usd": 0.0,
+      "latency_s": 0.0,
+      "escalation_count": 0,
+      "steps_executed": 0,
+      "retries": 0,
+      "error": "Failed to generate valid plan: Expecting ',' delimiter: line 17 column 17 (char 496)"
+    }
+  ],
+  "direct_results": [
+    {
+      "task_id": "gsm8k_1",
+      "method": "direct",
+      "prompt": "A store sells notebooks for $3 each and pens for $1.50 each. Maria buys 4 notebooks and 6 pens. She pays with a $50 bill. How much change does she receive? Show your work step by step.",
+      "output": "To find the total amount of change Maria receives, we need to calculate the total cost of her purchases and subtract it from the $50 bill she paid with.\n\nStep 1: Calculate the total cost of notebooks\nNumber of notebooks = 4\nCost per notebook = $3\nTotal cost of notebooks = Number of notebooks \u00d7 Cost per notebook\n= 4 \u00d7 $3\n= $12\n\nStep 2: Calculate the total cost of pens\nNumber of pens = 6\nCost per pen = $1.50\nTotal cost of pens = Number of pens \u00d7 Cost per pen\n= 6 \u00d7 $1.50\n= $9\n\nStep 3: Calculate the total cost of all purchases\nTotal cost of notebooks + Total cost of pens\n= $12 + $9\n= $21\n\nStep 4: Subtract the total cost from the amount Maria paid with ($50)\nChange = Amount paid - Total cost\n= $50 - $21\n= $29\n\nTherefore, Maria receives $29 as change.",
+      "success": true,
+      "accuracy": true,
+      "cost_usd": 0.0,
+      "latency_s": 9.30188250541687,
+      "escalation_count": 0,
+      "steps_executed": 0,
+      "retries": 0,
+      "error": ""
+    }
+  ]
+}

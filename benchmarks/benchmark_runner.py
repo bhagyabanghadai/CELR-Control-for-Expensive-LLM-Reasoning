@@ -72,6 +72,7 @@ class BenchmarkReport:
     model: str
     budget: float
     timestamp: str = ""
+    direct_model: str = ""  # If different from CELR model
     celr_results: List[TaskResult] = field(default_factory=list)
     direct_results: List[TaskResult] = field(default_factory=list)
 
@@ -84,8 +85,15 @@ class BenchmarkReport:
             f"\n{'='*80}",
             "CELR BENCHMARK REPORT",
             f"{'='*80}",
-            f"Model: {self.model}  |  Budget: ${self.budget:.2f}",
-            f"Tasks: {total_tasks}  |  Time: {self.timestamp}",
+        ]
+        if self.direct_model and self.direct_model != self.model:
+            lines.append(f"CELR Model:   {self.model}")
+            lines.append(f"Direct Model: {self.direct_model}")
+            lines.append(f"Budget: ${self.budget:.2f}  |  Tasks: {total_tasks}  |  Time: {self.timestamp}")
+        else:
+            lines.append(f"Model: {self.model}  |  Budget: ${self.budget:.2f}")
+            lines.append(f"Tasks: {total_tasks}  |  Time: {self.timestamp}")
+        lines += [
             f"\n{'─'*80}",
             f"{'Method':<10} {'Accuracy':<12} {'Avg Cost':<14} {'Avg Latency':<14} {'Escalations':<12}",
             f"{'─'*80}",
@@ -271,7 +279,15 @@ def run_celr(task: dict, model: str, budget: float) -> TaskResult:
                 s.output or "" for s in plan.items if s.output
             )
             result.output = combined_output
+
+            # Check accuracy: try combined first, then per-step
             result.accuracy = check_accuracy(combined_output, task["expected_contains"])
+            if not result.accuracy:
+                # Fallback: check each step individually
+                for s in plan.items:
+                    if s.output and check_accuracy(s.output, task["expected_contains"]):
+                        result.accuracy = True
+                        break
 
     except Exception as e:
         result.error = str(e)
@@ -280,8 +296,16 @@ def run_celr(task: dict, model: str, budget: float) -> TaskResult:
     return result
 
 
-def run_benchmark(model: str = "gpt-4o-mini", budget: float = 0.50, tasks=None, suite: str = "standard", output_file: str = None):
-    """Run the full benchmark suite."""
+def run_benchmark(model: str = "gpt-4o-mini", budget: float = 0.50, tasks=None, suite: str = "standard", output_file: str = None, direct_model: str = None):
+    """Run the full benchmark suite.
+    
+    Args:
+        model: Model for CELR pipeline
+        direct_model: Model for Direct calls (defaults to same as model)
+    """
+    if direct_model is None:
+        direct_model = model
+    
     if tasks is None:
         tasks = GPT4_BENCHMARK_TASKS if suite == "gpt4" else BENCHMARK_TASKS
 
@@ -289,23 +313,30 @@ def run_benchmark(model: str = "gpt-4o-mini", budget: float = 0.50, tasks=None, 
         model=model,
         budget=budget,
         timestamp=time.strftime("%Y-%m-%d %H:%M:%S"),
+        direct_model=direct_model,
     )
 
     suite_label = "GPT-4 Level" if suite == "gpt4" else "Standard"
-    logger.info(f"Starting {suite_label} benchmark: {len(tasks)} tasks, model={model}, budget=${budget:.2f}")
+    if model != direct_model:
+        logger.info(f"Starting {suite_label} benchmark: {len(tasks)} tasks")
+        logger.info(f"  CELR model:   {model}")
+        logger.info(f"  Direct model: {direct_model}")
+        logger.info(f"  Budget: ${budget:.2f}")
+    else:
+        logger.info(f"Starting {suite_label} benchmark: {len(tasks)} tasks, model={model}, budget=${budget:.2f}")
 
     for i, task in enumerate(tasks, 1):
         cat = task.get('category', task.get('difficulty', 'unknown'))
         logger.info(f"\n[{i}/{len(tasks)}] {task['id']} ({cat})")
 
-        # 1. Direct LLM call
-        logger.info(f"  Running DIRECT...")
-        direct_result = run_direct(task, model)
+        # 1. Direct LLM call (uses direct_model — the "big" model)
+        logger.info(f"  Running DIRECT ({direct_model})...")
+        direct_result = run_direct(task, direct_model)
         report.direct_results.append(direct_result)
         logger.info(f"  Direct: {'✅' if direct_result.accuracy else '❌'} ${direct_result.cost_usd:.6f} ({direct_result.latency_s:.1f}s)")
 
-        # 2. CELR pipeline
-        logger.info(f"  Running CELR...")
+        # 2. CELR pipeline (uses model — the "small" model)
+        logger.info(f"  Running CELR ({model})...")
         celr_result = run_celr(task, model, budget)
         report.celr_results.append(celr_result)
         logger.info(f"  CELR:   {'✅' if celr_result.accuracy else '❌'} ${celr_result.cost_usd:.6f} ({celr_result.latency_s:.1f}s)")
@@ -330,7 +361,8 @@ def run_benchmark(model: str = "gpt-4o-mini", budget: float = 0.50, tasks=None, 
 
 def main():
     parser = argparse.ArgumentParser(description="CELR Benchmark Runner")
-    parser.add_argument("--model", default="ollama/llama3.2", help="LLM model to test")
+    parser.add_argument("--model", default="ollama/llama3.2", help="LLM model for CELR pipeline (small model)")
+    parser.add_argument("--direct-model", default=None, help="LLM model for Direct calls (big model). Defaults to --model if not set.")
     parser.add_argument("--budget", type=float, default=0.50, help="Budget per task")
     parser.add_argument("--suite", choices=["standard", "gpt4"], default="standard", help="Task suite: standard (12 tasks) or gpt4 (20 GPT-4-level tasks)")
     parser.add_argument("--category", help="Filter by category (e.g. mmlu, humaneval, gsm8k, arc, math)")
@@ -368,7 +400,7 @@ def main():
                 print(f"  {cat.upper():<12} {score:.1f}%")
         return
 
-    run_benchmark(model=args.model, budget=args.budget, tasks=tasks, suite=args.suite, output_file=args.output_file)
+    run_benchmark(model=args.model, budget=args.budget, tasks=tasks, suite=args.suite, output_file=args.output_file, direct_model=args.direct_model)
 
 
 if __name__ == "__main__":

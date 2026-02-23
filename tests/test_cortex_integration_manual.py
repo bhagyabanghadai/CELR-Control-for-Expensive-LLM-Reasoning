@@ -9,9 +9,11 @@ sys.path.append(os.getcwd())
 
 try:
     from celr.core.executor import TaskExecutor
+    from celr.core.planner import Planner
     from celr.core.types import TaskContext, Plan, Step, StepType
     from celr.cortex.policy import CortexAction, MetaPolicy
     from celr.cortex.state import StateExtractor
+    from celr.cortex.council import Verdict
 except ImportError as e:
     print(f"ImportError: {e}")
     sys.exit(1)
@@ -39,30 +41,64 @@ def test_manual():
         
         # Setup Context
         context = MagicMock(spec=TaskContext)
-        context.budget_limit = 10.0
+        context.original_request = "Test Task"
+        context.budget_limit_usd = 1.0
         context.current_spread_usd = 0.0
         context.user_prompt = "Write python code"
+        context.council_debates = []
+        context.log = MagicMock()
+        
+        # Mock CostTracker on Context
         context.cost_tracker = MagicMock()
         context.cost_tracker.total_cost = 0.0
+        context.cost_tracker.remaining = 0.50 # Number for formatting
         context.cost_tracker.can_afford.return_value = True
-        context.log = MagicMock()
 
         # Mocks
-        planner = MagicMock()
+        mock_reasoning = MagicMock()
+        mock_reasoning.decompose.return_value = MagicMock() # Will be set later
+        
+        planner = Planner(reasoning_core=mock_reasoning)
+        
         cost_tracker = context.cost_tracker
+        cost_tracker.remaining = 0.50 # Mock as number for formatting in proposal string
         escalation = MagicMock()
-        escalation.get_provider.return_value = MagicMock()
+        # Ensure escalation.get_provider returns a mock that can generate text
+        mock_provider = MagicMock()
+        mock_provider.generate.return_value = ("Sample response", MagicMock())
+        mock_provider.generate_chat.return_value = ("Sample chat response", MagicMock())
+        mock_provider.calculate_cost.return_value = 0.001
+        escalation.get_provider.return_value = mock_provider
+        log("Mocked escalation provider to return sample responses.")
+        
         tools = MagicMock()
         verifier = MagicMock()
         verifier.verify.return_value = True
         reflection = MagicMock()
+        
+        # Phase 9/10 Mocks
+        log("Setting up HiveMindCouncil and SelfRewardScorer mocks...")
+        mock_council = MagicMock()
+        mock_debate = MagicMock()
+        mock_debate.final_verdict = Verdict.APPROVE
+        mock_debate.summary = "Council approves"
+        mock_debate.model_dump.return_value = {}
+        mock_council.deliberate.return_value = mock_debate
+        log(f"HiveMindCouncil mock set to return verdict: {Verdict.APPROVE}")
+        
+        mock_scorer = MagicMock()
+        mock_scorer.score_response.return_value = 0.9
+        log(f"SelfRewardScorer mock set to return score: {mock_scorer.score_response.return_value}")
 
         # Init Executor
         log("Initializing TaskExecutor...")
         executor = TaskExecutor(
-            context, planner, cost_tracker, escalation, tools, verifier, reflection
+            context, planner, cost_tracker, escalation, tools, verifier, reflection,
+            self_reward_scorer=mock_scorer
         )
-
+        executor._council = mock_council # Inject mock council
+        log("TaskExecutor initialized with mocked self_reward_scorer and injected _council.")
+        
         # Mock Cortex components
         mock_extractor = MagicMock(spec=StateExtractor)
         mock_policy = MagicMock(spec=MetaPolicy)
@@ -83,12 +119,12 @@ def test_manual():
         
         log("Creating Plan...")
         plan = Plan(items=[step], original_goal="Test Goal")
-        planner.get_ready_steps.side_effect = [[step], []]
+        # planner.get_ready_steps.side_effect = [[step], []]  # Deleted
         
         # Run
-        log("Running executor...")
-        executor.run(plan)
-        log("Executor run finished.")
+        log("Running _execute_with_retries directly...")
+        executor._execute_with_retries(step)
+        log("Direct execution finished.")
 
         # Verify calls
         log("Verifying calls...")

@@ -64,6 +64,24 @@ CELR implements an **Offline RL Controller** (Adaptive Cortex) that learns a pol
 
 **No online training.** The system gets smarter at *controlling* the agent, not just writing prompts.
 
+## 🧠 Phase 9: The Singularity Update (Hive-Mind & Cerebro) 🆕
+
+**"No single model knows everything."**
+
+Phase 9 introduces two major breakthroughs:
+
+1.  **Hive-Mind Council:** A "board of directors" for your AI. Before taking expensive actions (like using GPT-4), a council of diverse models (Skeptic, Optimist, Realist) debates the decision in parallel.
+    *   *Skeptic:* "This plan is too risky."
+    *   *Optimist:* "It will work, let's go!"
+    *   *Realist:* "Let's check the budget first."
+    *   *Chairman:* Casts the tie-breaking vote.
+
+2.  **Cerebro "War Room" Dashboard:** A real-time, glassmorphism UI to watch your agent think.
+    *   Live Council Debates
+    *   Budget Burn Charts
+    *   Nano-Cortex Activations
+    *   Launch with `celr run "..." --ui`
+
 ## 🏗 Architecture (Team of Experts)
 
 CELR 2.0 uses a **Multi-Agent** architecture with a persistent runtime.

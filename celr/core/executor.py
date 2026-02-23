@@ -142,7 +142,7 @@ class TaskExecutor:
         """
         self.context.log(f"Executing step: {step.description} ({step.id})")
         step.status = TaskStatus.RUNNING
-
+        
         for attempt in range(step.max_retries + 1):
             step.retry_count = attempt
 
@@ -184,13 +184,10 @@ class TaskExecutor:
                     self.context.log(f"🛑 Cortex aborted step {step.id} (Safety/Cost risk)")
                     logger.warning("Cortex triggered ABORT")
                     step.status = TaskStatus.FAILED
-                    break # Stop retries
+                    return # Stop retries
                 
                 elif action == CortexAction.ESCALATE:
                     # ── Phase 9: Hive-Mind Council deliberation ──────────
-                    # Before committing to the expensive model, ask the
-                    # Council of Experts to vote on whether escalation is
-                    # truly needed.  All three critics fire in PARALLEL.
                     if self._council is None:
                         self._council = HiveMindCouncil()
                     proposal = (
@@ -210,7 +207,6 @@ class TaskExecutor:
                         force_expensive = True
                     else:
                         self.context.log("🚫 Council REJECTED escalation → staying with cheap model")
-                        force_expensive = False
                     
                     # Update dashboard with debate results
                     if self.trajectory_logger:
@@ -218,8 +214,6 @@ class TaskExecutor:
                     # ─────────────────────────────────────────────────────
 
                 elif action == CortexAction.STOP:
-                    # Rare case: Early success prediction?
-                    # For now, treat as proceed normally.
                     pass
 
                 # 3. Budget check (Legacy safety net)
@@ -234,13 +228,34 @@ class TaskExecutor:
                 # 4. Dispatch (route + execute)
                 # Pass force_expensive flag if Cortex requested escalation
                 if step.step_type == StepType.EXECUTION:
-                     # Tools don't use LLM provider directly in dispatch_tool yet, 
-                     # but _get_code_from_llm does.
-                     result = self._dispatch_tool(step, force_expensive)
+                    raw_output = self._dispatch_tool(step, force_expensive=force_expensive)
                 else:
-                     result = self._dispatch_llm(step, force_expensive)
-                
-                step.output = result
+                    raw_output = self._dispatch_llm(step, force_expensive=force_expensive)
+
+                step.output = raw_output
+
+                # --- Phase 10: Online Self-Reward (TRM) ---
+                if hasattr(self, 'self_reward_scorer') and self.self_reward_scorer:
+                    trm_score = 1.0  # default pass if scorer fails
+                    try:
+                        trm_score = self.self_reward_scorer.score_response(step.description, raw_output)
+                        self.context.log(f"🧠 Self-Reward Score: {trm_score:.2f}")
+                        logger.info(f"Step {step.id} TRM Score: {trm_score:.2f}")
+
+                        # Store for logging
+                        if step.metadata is None:
+                            step.metadata = {}
+                        step.metadata["quality_score"] = trm_score
+
+                    except Exception as e:
+                        logger.warning(f"Self-reward scoring call failed: {e}")
+
+                    # Quality Gate
+                    if trm_score < 0.6:
+                        raise ToolExecutionError(
+                            f"Low TRM Quality Score ({trm_score:.2f} < 0.6). "
+                            f"Retrying with Reflexion to improve accuracy/completeness."
+                        )
 
                 # 3. Verify
                 is_valid = self.verifier.verify(step, self.context)
@@ -249,7 +264,7 @@ class TaskExecutor:
                     step.status = TaskStatus.COMPLETED
                     self.context.log(
                         f"Step {step.id} completed (attempt {attempt + 1}). "
-                        f"output_len={len(result)}"
+                        f"output_len={len(step.output) if step.output else 0}"
                     )
                     logger.info(f"Step {step.id} verified OK on attempt {attempt + 1}")
                     return
@@ -260,7 +275,6 @@ class TaskExecutor:
                     )
 
                     if self.reflection.should_retry(step, attempt):
-                        # Get reflection analysis and enhance the step description
                         fix = self.reflection.analyze_failure(step, self.context)
                         step.description += f"\n[Retry {attempt + 1} fix]: {fix}"
                         logger.info(f"Reflection suggested fix for step {step.id}")
@@ -288,7 +302,7 @@ class TaskExecutor:
         self.context.log(f"Step {step.id} FAILED after {step.retry_count + 1} attempts.")
         logger.error(f"Step {step.id} failed after {step.retry_count + 1} attempts")
 
-    def _dispatch(self, step: Step) -> str:
+    def _dispatch(self, step: Step, force_expensive: bool = False) -> str:
         """
         Route and execute a step based on its type.
         
@@ -297,9 +311,9 @@ class TaskExecutor:
         - VERIFICATION → LLM call (verifier handles this separately)
         """
         if step.step_type == StepType.EXECUTION:
-            return self._dispatch_tool(step)
+            return self._dispatch_tool(step, force_expensive=force_expensive)
         else:
-            return self._dispatch_llm(step)
+            return self._dispatch_llm(step, force_expensive=force_expensive)
 
     def _dispatch_tool(self, step: Step, force_expensive: bool = False) -> str:
         """Execute a tool-based step."""
@@ -358,13 +372,15 @@ class TaskExecutor:
         provider = self.escalation.get_provider(step, force_expensive=force_expensive)
 
         prompt = (
-            f"Task: {step.description}\n\n"
+            f"Original User Request: {self.context.original_request}\n\n"
+            f"Current Step: {step.description}\n\n"
             f"Context (recent history):\n{self.context.execution_history[-5:]}\n\n"
             f"System Instructions:\n"
-            f"1. Provide a clear, actionable response.\n"
-            f"2. Do NOT hallucinate data. Use ONLY values provided in the task.\n"
-            f"3. For math problems, calculate explicitly. Do NOT use `input()`.\n"
-            f"4. If writing code, ensure it is self-contained and prints the result.\n"
+            f"1. Answer the question directly and concisely.\n"
+            f"2. For simple factual questions, just provide the answer — do NOT write code.\n"
+            f"3. Do NOT hallucinate data. Use ONLY values provided in the task.\n"
+            f"4. For math problems, calculate explicitly. NEVER use `input()`.\n"
+            f"5. IMPORTANT: `input()` is NOT SUPPORTED and will cause a CRASH.\n"
         )
 
         text, usage = provider.generate(prompt)
@@ -406,11 +422,16 @@ class TaskExecutor:
             f"Active Variables (DO NOT REDEFINE THESE):\n{runtime_context}\n\n"
             f"Recent Output History:\n{history_text}\n\n"
             f"Constraints:\n"
-            f"1. Return ONLY the code, no explanation.\n"
+            f"1. Return ONLY executable Python code, no explanation or markdown.\n"
             f"2. Use existing variables from 'Active Variables' directly.\n"
-            f"3. Do NOT use `input()`. Use variables for values.\n"
+            f"3. NEVER use `input()`. Use variables for values. If values are missing, use a hardcoded fallback or fail.\n"
             f"4. Print the final result explicitly.\n"
             f"5. Extract numbers/data from 'Original User Task' if not in 'Active Variables'.\n"
+            f"6. CRITICAL: Any use of `input()` will trigger a sandbox security violation and FAIL the task.\n"
+            f"7. CRITICAL: For math problems, hard-code the exact numbers from the Original User Task. "
+            f"Compute step-by-step. Double-check your arithmetic.\n"
+            f"   Example: '25% of 80' means 0.25 * 80 = 20, NOT 0.25 / 100 * 80.\n"
+            f"8. Always assign intermediate results to variables and print the final answer.\n"
         )
         
         # Inject the Specialist System Prompt
@@ -453,8 +474,10 @@ class TaskExecutor:
         # Combine Critic System Prompt with the specific verification task
         prompt = (
             f"{critic.system_prompt}\n\n"
-            f"User Request: {step.description}\n"
+            f"Original User Request: {self.context.original_request}\n"
+            f"Current Step: {step.description}\n"
             f"Generated Logic/Code:\n{code}\n\n"
+            f"Verify that ALL numbers and formulas match the Original User Request exactly.\n"
             f"Analyze strict compliance."
         )
         

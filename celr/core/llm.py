@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
 import litellm
+import concurrent.futures
 from tenacity import (
     retry,
     retry_if_exception_type,
@@ -67,6 +68,10 @@ class LiteLLMProvider(BaseLLMProvider):
 
     def __init__(self, config: ModelConfig):
         self.config = config
+        # Increase workers to 10 so one hanging call doesn't block the whole provider
+        self._executor = concurrent.futures.ThreadPoolExecutor(max_workers=10)
+        # Prevent LiteLLM from failing on unsupported params
+        litellm.drop_params = True
 
     @retry(
         stop=stop_after_attempt(3),
@@ -111,11 +116,18 @@ class LiteLLMProvider(BaseLLMProvider):
             kwargs["keep_alive"] = self.config.ollama_keep_alive
 
         try:
-            response = litellm.completion(
+            # Hard timeout wrapper since litellm's native timeout sometimes hangs on local models
+            future = self._executor.submit(
+                litellm.completion,
                 model=self.config.name,
                 messages=messages,
+                timeout=120,
+                num_predict=512,  # Prevent infinite generation loops on local models
+                max_tokens=512,
                 **kwargs
             )
+            response = future.result(timeout=130)  # Slightly buffer the join
+
 
             text = response.choices[0].message.content or ""
             
@@ -161,10 +173,16 @@ class LiteLLMProvider(BaseLLMProvider):
             Tuple of (response_text, LLMUsage)
         """
         try:
-            response = litellm.completion(
+            future = self._executor.submit(
+                litellm.completion,
                 model=self.config.name,
                 messages=messages,
+                timeout=120,
+                num_predict=512,
+                max_tokens=512
             )
+            response = future.result(timeout=130)
+
 
             text = response.choices[0].message.content or ""
             
