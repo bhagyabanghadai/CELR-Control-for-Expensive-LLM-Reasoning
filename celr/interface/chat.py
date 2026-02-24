@@ -510,40 +510,9 @@ def get_budget(model_info):
 
 def create_chat_engine(model_info, budget):
     """Build the LLM provider for chat."""
-    # ─── Self-Correction: Auto-Install Dependencies ───────────────────
-    import subprocess
-    import sys
-
-    def ensure_dependencies():
-        """Check and install missing dependencies automatically."""
-        required = {
-            "wikipedia": "wikipedia",
-            "duckduckgo_search": "duckduckgo-search",
-            "bs4": "beautifulsoup4",
-            "requests": "requests"
-        }
-        missing = []
-        for module, package in required.items():
-            try:
-                __import__(module)
-            except ImportError:
-                missing.append(package)
-        
-        if missing:
-            print(f"🔧 Installing missing tools for reasoning: {', '.join(missing)}...")
-            try:
-                subprocess.check_call([sys.executable, "-m", "pip", "install", *missing], 
-                                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                print("✅ Tools installed successfully!\n")
-            except Exception as e:
-                print(f"⚠️ Failed to auto-install tools: {e}")
-                print(f"   Please run: pip install {' '.join(missing)}\n")
-
-    ensure_dependencies()
-
-    # Now import the rest
     # Core Imports
     from celr.core.types import TaskContext, ModelConfig
+    from celr.core.config import CELRConfig
     from celr.core.cost_tracker import CostTracker
     from celr.core.llm import LiteLLMProvider
     from celr.core.planner import Planner
@@ -555,6 +524,10 @@ def create_chat_engine(model_info, budget):
     from celr.core.escalation import EscalationManager
     from celr.cortex.router import Router
     from unittest.mock import MagicMock
+
+    # Load config for reliability mode
+    config = CELRConfig()
+    reliability_mode = config.reliability_mode
 
     model_config = ModelConfig(
         name=model_info["model"],
@@ -575,10 +548,10 @@ def create_chat_engine(model_info, budget):
     tracker = CostTracker(context)
     
     # -- Build the Reasoning Stack (for Smart Mode) --
-    tools = ToolRegistry()
+    tools = ToolRegistry(reliability_mode=reliability_mode)
     reasoning = ReasoningCore(llm=provider)
     planner = Planner(reasoning)
-    verifier = Verifier(tool_registry=tools, llm=provider)
+    verifier = Verifier(tool_registry=tools, llm=provider, reliability_mode=reliability_mode)
     reflection = SelfReflection(llm=provider)
     escalation = EscalationManager(tracker, [model_config]) # Simplified for chat
     
