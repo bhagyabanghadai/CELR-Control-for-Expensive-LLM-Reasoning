@@ -708,7 +708,7 @@ class TestOllamaDetection:
         import inspect
         sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
         
-        from celr_chat import check_ollama_running
+        from celr.interface.chat import check_ollama_running
         source = inspect.getsource(check_ollama_running)
         assert "127.0.0.1" in source
         # Verify the actual URL uses 127.0.0.1 (localhost may appear in docstring)
@@ -717,7 +717,7 @@ class TestOllamaDetection:
     def test_get_ollama_models_uses_127001(self):
         """get_ollama_models should use 127.0.0.1 in its URL."""
         import inspect
-        from celr_chat import get_ollama_models
+        from celr.interface.chat import get_ollama_models
         source = inspect.getsource(get_ollama_models)
         assert 'http://127.0.0.1:11434' in source
 
