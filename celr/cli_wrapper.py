@@ -1,9 +1,18 @@
 #!/usr/bin/env python3
+"""
+CELR CLI Wrapper — unified entry point.
+
+Routes to subcommands:
+  celr init    — configuration wizard
+  celr run     — execute a headless task (delegates to celr.cli)
+  celr chat    — launch interactive chat
+"""
 import sys
 import argparse
 import subprocess
 import os
 from celr.core.config import CELRConfig
+
 
 def run_init():
     """Run the configuration wizard."""
@@ -43,29 +52,37 @@ def run_init():
     else:
         print("\nℹ️  No API keys provided. CELR will use local Ollama models by default.")
 
-def run_task(prompt: str, budget: float, ui: bool, verbose: bool, small: str, mid: str, large: str):
-    """Run a headless task via celr.cli module."""
-    # We use subprocess to run the module so it picks up the environment correctly
-    cmd = [sys.executable, "-m", "celr.cli", prompt]
-    if budget:
-        cmd.extend(["--budget", str(budget)])
-    if ui:
-        cmd.append("--ui")
-    if verbose:
-        cmd.append("--verbose")
-    if small:
-        cmd.extend(["--small-model", small])
-    if large:
-        cmd.extend(["--large-model", large])
-    # Note: celr.cli doesn't have --mid-model flag yet, but we can pass it via env if needed,
-    # or just rely on config/env vars for that.
-    
-    # Pass mid model via environment variable if specified
-    env = os.environ.copy()
-    if mid:
-        env["CELR_MID_MODEL"] = mid
 
-    subprocess.run(cmd, env=env)
+def run_task(args):
+    """Run a headless task by calling celr.cli.main() directly."""
+    # Build sys.argv for cli.main() as if called from command line
+    cli_args = [args.prompt]
+    if args.budget is not None:
+        cli_args.extend(["--budget", str(args.budget)])
+    if args.ui:
+        cli_args.append("--ui")
+    if args.verbose:
+        cli_args.append("--verbose")
+    if args.small_model:
+        cli_args.extend(["--small-model", args.small_model])
+    if args.large_model:
+        cli_args.extend(["--large-model", args.large_model])
+    if args.reliability_mode:
+        cli_args.extend(["--reliability-mode", args.reliability_mode])
+
+    # Pass mid model via environment variable if specified
+    if args.mid_model:
+        os.environ["CELR_MID_MODEL"] = args.mid_model
+
+    # Direct call instead of subprocess — shares environment, faster startup
+    original_argv = sys.argv
+    try:
+        sys.argv = ["celr"] + cli_args
+        from celr.cli import main as cli_main
+        cli_main()
+    finally:
+        sys.argv = original_argv
+
 
 def run_chat():
     """Launch the interactive chat TUI."""
@@ -75,6 +92,7 @@ def run_chat():
     except ImportError:
         print("❌ Error: Could not import chat interface. Is 'celr.interface.chat' available?")
         sys.exit(1)
+
 
 def main():
     parser = argparse.ArgumentParser(description="CELR: Control for Expensive LLM Reasoning")
@@ -92,6 +110,9 @@ def main():
     run_parser.add_argument("--small-model", type=str, default=None, help="Override small/reasoning model")
     run_parser.add_argument("--mid-model", type=str, default=None, help="Override mid-tier model")
     run_parser.add_argument("--large-model", type=str, default=None, help="Override large/expensive model")
+    run_parser.add_argument("--reliability-mode", type=str, default=None,
+                            choices=["balanced", "strict", "research"],
+                            help="Reliability mode: balanced (default), strict, research")
 
     # celr chat
     subparsers.add_parser("chat", help="Launch interactive chat")
@@ -101,19 +122,12 @@ def main():
     if args.command == "init":
         run_init()
     elif args.command == "run":
-        run_task(
-            args.prompt, 
-            args.budget, 
-            args.ui, 
-            args.verbose, 
-            args.small_model, 
-            args.mid_model, 
-            args.large_model
-        )
+        run_task(args)
     elif args.command == "chat":
         run_chat()
     else:
         parser.print_help()
+
 
 if __name__ == "__main__":
     main()

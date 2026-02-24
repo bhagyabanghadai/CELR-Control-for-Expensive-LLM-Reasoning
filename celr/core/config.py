@@ -32,8 +32,11 @@ class CELRConfig(BaseSettings):
         extra="ignore",
     )
 
-    # Budget
+    # ─── Budget ─────────────────────────────────────────────────
     budget_limit: float = Field(default=0.50, description="Max USD to spend")
+
+    # ─── Reliability Mode ───────────────────────────────────────
+    reliability_mode: str = Field(default="balanced", description="Reliability mode: 'balanced', 'strict', or 'research'")
     max_retries: int = Field(default=3, description="Max retry attempts per step")
 
     # Models
