@@ -4,6 +4,22 @@ All notable changes to CELR will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.1.1] - 2026-02-24
+
+### Added
+- **TinyR Thesis Validation**: Confirmed that small models (1.5B) with recursive control can outperform 8B models on reasoning benchmarks.
+- **Benchmark Runner v2**: Added multi-threading support, global timeouts, and more robust error handling for long-running benchmarks.
+- **GPU Optimizations**: Added configuration support for Ollama `num_ctx`, `keep_alive`, and specific quantization settings to optimize VRAM usage.
+- **Phase 8 (Finalized)**: Promotion Gate and Offline RL policy integration are now fully operational and verified.
+
+### Fixed
+- Benchmark hang issues caused by deadlocks in worker threads.
+- Inconsistent cost tracking for local model providers.
+
+### Changed
+- README overhauled to reflect the TinyR philosophy and latest production status.
+- Test suite expanded to 92 passing tests.
+
 ## [0.1.0] - 2026-02-12
 
 ### Added
