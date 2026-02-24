@@ -4,6 +4,12 @@ from pydantic import BaseModel, Field, field_validator
 import uuid
 from datetime import datetime
 
+class ReliabilityMode(str, Enum):
+    """Controls safety/determinism trade-offs across the runtime."""
+    BALANCED = "balanced"    # Default — current behavior
+    STRICT = "strict"        # Fail-closed, no shell, sandboxed runtime
+    RESEARCH = "research"    # Permissive — current baseline
+
 class TaskStatus(str, Enum):
     PENDING = "PENDING"
     RUNNING = "RUNNING"
@@ -99,7 +105,6 @@ class ModelConfig(BaseModel):
     context_window: int = 4096
     
     # Capabilities
-    supports_tools: bool = False
     supports_tools: bool = False
     is_reasoning_model: bool = False # e.g. o1
 

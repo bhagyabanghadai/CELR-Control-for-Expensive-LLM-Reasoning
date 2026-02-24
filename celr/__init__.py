@@ -5,10 +5,10 @@ A meta-brain for AI agents that optimizes cost and quality
 by routing tasks to the right model at the right time.
 """
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 from celr.core.config import CELRConfig
-from celr.core.types import TaskContext, Plan, Step, StepType, TaskStatus
+from celr.core.types import TaskContext, Plan, Step, StepType, TaskStatus, ReliabilityMode
 from celr.core.executor import TaskExecutor
 from celr.core.llm import BaseLLMProvider, LiteLLMProvider, LLMUsage
 from celr.core.cost_tracker import CostTracker
@@ -28,6 +28,7 @@ __all__ = [
     "Step",
     "StepType",
     "TaskStatus",
+    "ReliabilityMode",
     "TaskExecutor",
     "BaseLLMProvider",
     "LiteLLMProvider",
