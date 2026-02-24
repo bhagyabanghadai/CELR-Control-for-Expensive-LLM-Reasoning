@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "celr"
-version = "0.1.0"
+version = "0.1.1"
 description = "Control for Expensive LLM Reasoning - A meta-brain for AI agents."
 readme = "README.md"
 authors = [
@@ -13,17 +13,28 @@ authors = [
 requires-python = ">=3.10"
 dependencies = [
     "pydantic>=2.0.0",
-    "pydantic-settings>=2.0.0",  # For CELRConfig (BaseSettings)
+    "pydantic-settings>=2.0.0",
     "litellm>=1.0.0",
     "rich>=13.0.0",
     "python-dotenv>=1.0.0",
-    "networkx>=3.0",  # For DAG handling in plans
-    "tenacity>=8.0.0",  # Retry with exponential backoff for LLM calls
-    "numpy>=1.24.0",   # For vector similarity (Active Memory)
-    "torch>=2.0.0",    # For Adaptive Cortex (Nano-Decision Transformer)
-    "streamlit>=1.32.0", # For Cerebro War Room Dashboard (Phase 9)
-    "pandas>=2.0.0",   # For Cerebro charts and data frames
+    "networkx>=3.0",
+    "tenacity>=8.0.0",
+    "numpy>=1.24.0",
+    # Reasoning engine tools
+    "wikipedia>=1.4.0",
+    "duckduckgo-search>=5.0.0",
+    "beautifulsoup4>=4.12.0",
+    "requests>=2.31.0",
 ]
+
+[project.optional-dependencies]
+# Heavy deps — only needed for specific features
+cortex = ["torch>=2.0.0"]           # Adaptive Cortex (Nano-Decision Transformer)
+dashboard = [
+    "streamlit>=1.32.0",            # Cerebro War Room Dashboard (Phase 9)
+    "pandas>=2.0.0",                # Cerebro charts and data frames
+]
+all = ["celr[cortex,dashboard]"]
 
 [project.scripts]
 celr = "celr.cli_wrapper:main"

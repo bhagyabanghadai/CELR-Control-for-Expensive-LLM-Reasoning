@@ -53,6 +53,9 @@ Examples:
     parser.add_argument("--small-model", type=str, default=None, help="Override small model name")
     parser.add_argument("--large-model", type=str, default=None, help="Override large model name")
     parser.add_argument("--ui", action="store_true", help="Launch Cerebro war room dashboard")
+    parser.add_argument("--reliability-mode", type=str, default=None,
+                        choices=["balanced", "strict", "research"],
+                        help="Reliability mode: balanced (default), strict (fail-closed), research (permissive)")
     args = parser.parse_args()
 
     # 1. Load Config (env vars → .env file → CLI args override)
@@ -65,6 +68,8 @@ Examples:
         config_overrides["small_model"] = args.small_model
     if args.large_model:
         config_overrides["large_model"] = args.large_model
+    if args.reliability_mode:
+        config_overrides["reliability_mode"] = args.reliability_mode
 
     config = CELRConfig(**config_overrides)
     config.setup_logging()
@@ -109,8 +114,8 @@ Examples:
 
     # Verifier uses the cheapest available model
     verifier_llm = LiteLLMProvider(config.get_model_tiers()[0])
-    tool_registry = ToolRegistry()
-    verifier = Verifier(tool_registry=tool_registry, llm=verifier_llm)
+    tool_registry = ToolRegistry(reliability_mode=config.reliability_mode)
+    verifier = Verifier(tool_registry=tool_registry, llm=verifier_llm, reliability_mode=config.reliability_mode)
 
     # Reflection uses the same cheap model
     reflection = SelfReflection(llm=verifier_llm)
@@ -130,6 +135,7 @@ Examples:
     # 4. Execute
     console.print(f"\n[bold]Task:[/bold] {args.task}\n")
 
+    plan = None
     try:
         with console.status("[bold green]Planning...", spinner="dots"):
             plan = planner.create_initial_plan(context)
@@ -180,7 +186,7 @@ Examples:
     result_table.add_row("Status", f"[{color}]{final_status}[/{color}]")
     result_table.add_row("Total Cost", f"${context.current_spread_usd:.6f}")
     result_table.add_row("Budget Remaining", f"${context.budget_remaining:.6f}")
-    result_table.add_row("Steps", str(len(plan.items) if 'plan' in dir() else "N/A"))
+    result_table.add_row("Steps", str(len(plan.items)) if plan else "N/A")
     console.print(result_table)
 
     # 6. Save trajectory
