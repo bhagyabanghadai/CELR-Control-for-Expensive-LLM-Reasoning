@@ -3,6 +3,7 @@ from typing import Any, Optional
 from celr.core.types import Step, StepType, TaskContext
 from celr.core.tools import ToolRegistry
 from celr.core.llm import BaseLLMProvider
+from celr.core.types import ReliabilityMode
 
 logger = logging.getLogger(__name__)
 
@@ -17,9 +18,10 @@ class Verifier:
       3. Output sanity checks (empty, too short, gibberish)
     """
 
-    def __init__(self, tool_registry: ToolRegistry, llm: BaseLLMProvider):
-        self.registry = tool_registry
+    def __init__(self, tool_registry: ToolRegistry, llm: BaseLLMProvider, reliability_mode: ReliabilityMode = ReliabilityMode.BALANCED):
+        self.tools = tool_registry
         self.llm = llm
+        self.reliability_mode = reliability_mode
         self.total_verification_cost = 0.0
 
     def verify(self, step: Step, context: TaskContext) -> bool:
@@ -111,7 +113,12 @@ REASON: (one sentence explanation)
                 return False
 
         except Exception as e:
-            logger.warning(f"LLM verification failed, falling back to pass: {e}")
+            logger.warning(f"LLM verification call failed: {e}")
+            if self.reliability_mode == ReliabilityMode.STRICT:
+                logger.error("Strict mode: fail-closed on LLM verification error")
+                step.verification_notes = f"Verification error (fail-closed): {e}"
+                return False
+            # Balanced/Research: auto-pass to avoid blocking
             step.verification_notes = f"Verification error (auto-passed): {e}"
             return True  # Fail-open to avoid blocking on verification errors
 

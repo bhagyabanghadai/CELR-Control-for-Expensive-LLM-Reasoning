@@ -21,6 +21,7 @@ import signal
 from typing import Any, Callable, Dict, Optional
 
 from celr.core.exceptions import ToolExecutionError
+from celr.core.types import ReliabilityMode
 
 logger = logging.getLogger(__name__)
 
@@ -47,8 +48,9 @@ EXEC_TIMEOUT_SECONDS = 10
 class ToolRegistry:
     """Registry for agent tools with safe execution."""
 
-    def __init__(self):
+    def __init__(self, reliability_mode: str = "balanced"):
         self._tools: Dict[str, Callable] = {}
+        self.reliability_mode = reliability_mode
         self.register_basic_tools()
 
     def register(self, name: str, func: Callable) -> None:
@@ -95,15 +97,21 @@ class ToolRegistry:
     def register_basic_tools(self) -> None:
         """Register the default built-in tools."""
         self.register("python_repl", self._python_repl)
-        self.register("shell_exec", self._shell_exec)
+        if self.reliability_mode != ReliabilityMode.STRICT:
+            self.register("shell_exec", self._shell_exec)
+        else:
+            logger.info("Strict mode: shell_exec tool is DISABLED")
 
     def _python_repl(self, code: str) -> str:
         """Executes Python code in a sandboxed environment with restricted builtins."""
         output_buffer = io.StringIO()
         
         # Restricted globals — no file I/O, no imports
+        builtins = SAFE_BUILTINS.copy()
+        if self.reliability_mode == ReliabilityMode.STRICT:
+            builtins.pop("__import__", None)  # Block all imports in strict mode
         restricted_globals = {
-            "__builtins__": SAFE_BUILTINS,
+            "__builtins__": builtins,
             "__name__": "__main__",
         }
 

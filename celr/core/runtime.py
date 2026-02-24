@@ -3,14 +3,30 @@ import sys
 import traceback
 from typing import Dict, Any, Tuple
 
+from celr.core.types import ReliabilityMode
+
+# Builtins whitelist for strict mode (mirrors tools.py)
+import builtins as _builtins
+_BLOCKED = {"open", "exec", "eval", "compile", "globals", "locals",
+            "breakpoint", "exit", "quit", "input", "__import__"}
+_STRICT_BUILTINS = {k: v for k, v in vars(_builtins).items()
+                    if not k.startswith("_") or k in ("__build_class__", "__name__")
+                    if k not in _BLOCKED}
+
+
 class PersistentRuntime:
     """
     A stateful Python runtime environment that persists variables across executions.
     Mimics a REPL session or Jupyter kernel.
     """
-    def __init__(self):
+    def __init__(self, reliability_mode: str = "balanced"):
+        self.reliability_mode = reliability_mode
         self.globals: Dict[str, Any] = {}
         self.locals: Dict[str, Any] = {}
+
+        # In strict mode, restrict builtins
+        if self.reliability_mode == ReliabilityMode.STRICT:
+            self.globals["__builtins__"] = _STRICT_BUILTINS
         
         # Pre-import common libraries to save time/tokens in steps
         self._exec_setup()
