@@ -95,7 +95,7 @@ graph TD
     Specialist -->|Code Task| Coder[Coder Agent]
     Specialist -->|Research| Researcher[Researcher Agent]
     
-    Mathematician --> Runtime[Persistent Runtime (REPL)]
+    Mathematician --> Runtime["Persistent Runtime (REPL)"]
     Coder --> Runtime
     
     Runtime --> Output[Draft Answer]
